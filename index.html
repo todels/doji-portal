@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Doji Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="stage"><canvas id="gl" aria-label="Animated doji portal: one clean line of light falling through a black hole that bends it into a ring"></canvas></div>
+
+
+<button type="button" class="show" id="show" hidden>Show controls</button>
+
+<form class="panel" id="panel" autocomplete="off">
+  <div>
+    <h1>Doji Portal</h1>
+    <p class="hint">Layers of dots fall in tight lines behind a black hole. Each layer bends into its own ring, so they stack and fill the disc. Press H to hide the panel.</p>
+  </div>
+
+  <div class="group">
+    <h2>Presets</h2>
+    <div class="btns">
+      <button type="button" data-preset="doji">Doji</button>
+      <button type="button" data-preset="clean">Clean</button>
+      <button type="button" data-preset="vortex">Vortex</button>
+      <button type="button" data-preset="wide">Wide</button>
+      <button type="button" data-preset="contour">Contour</button>
+    </div>
+  </div>
+
+  <div class="group">
+    <h2>Dots</h2>
+    <div class="row"><label for="lw">Dot size</label><input type="range" id="lw" min="0.2" max="4" step="0.01" value="0.2"><output for="lw"></output></div>
+    <div class="row"><label for="spread">Spread</label><input type="range" id="spread" min="0.0002" max="0.02" step="0.0001" value="0.0002"><output for="spread"></output></div>
+    <div class="row"><label for="dens">Dots</label><input type="range" id="dens" min="0" max="1" step="0.01" value="1"><output for="dens"></output></div>
+    <div class="row"><label for="stretch">Stretch</label><input type="range" id="stretch" min="0" max="1" step="0.01" value="0.49"><output for="stretch"></output></div>
+    <div class="row"><label for="glow">Glow dots</label><input type="range" id="glow" min="0" max="1" step="0.01" value="0.23"><output for="glow"></output></div>
+    <div class="row"><label for="gsize">Glow size</label><input type="range" id="gsize" min="0.5" max="4" step="0.01" value="3.63"><output for="gsize"></output></div>
+    <div class="row"><label for="front">Front line</label><input type="range" id="front" min="0" max="2" step="0.01" value="0.78"><output for="front"></output></div>
+    <div class="row"><label for="corebend">Middle warp</label><input type="range" id="corebend" min="0" max="1" step="0.01" value="0.3"><output for="corebend"></output></div>
+    <div class="row"><label for="halo">Haze</label><input type="range" id="halo" min="0" max="2" step="0.01" value="0"><output for="halo"></output></div>
+    <div class="row"><label for="fill">Fan out</label><input type="range" id="fill" min="0" max="1" step="0.01" value="0.34"><output for="fill"></output></div>
+    <div class="row"><label for="reach">Fan reach</label><input type="range" id="reach" min="0.5" max="4" step="0.01" value="0.8"><output for="reach"></output></div>
+    <div class="row"><label for="speed">Speed</label><input type="range" id="speed" min="0" max="1" step="0.01" value="0.08"><output for="speed"></output></div>
+    <div class="row"><label for="off">Offset</label><input type="range" id="off" min="-0.05" max="0.05" step="0.001" value="0"><output for="off"></output></div>
+  </div>
+
+  <div class="group">
+    <h2>Layers</h2>
+    <div class="row"><label for="layers">Layers</label><input type="range" id="layers" min="1" max="8" step="1" value="8"><output for="layers"></output></div>
+    <div class="row"><label for="depth">Depth</label><input type="range" id="depth" min="0" max="1" step="0.01" value="0.09"><output for="depth"></output></div>
+    <div class="row"><label for="loff">Drift</label><input type="range" id="loff" min="0" max="0.08" step="0.001" value="0.042"><output for="loff"></output></div>
+    <div class="row"><label for="tails">Back tails</label><input type="range" id="tails" min="0" max="1" step="0.01" value="1"><output for="tails"></output></div>
+    <div class="row"><label for="breathe">Breathe</label><input type="range" id="breathe" min="0" max="1" step="0.01" value="0.3"><output for="breathe"></output></div>
+    <div class="row"><label for="bspeed">Breathe speed</label><input type="range" id="bspeed" min="0.01" max="1" step="0.01" value="0.12"><output for="bspeed"></output></div>
+    <div class="row"><label for="hotamt">Hot ring</label><input type="range" id="hotamt" min="0" max="1" step="0.01" value="0"><output for="hotamt"></output></div>
+    <div class="row"><label for="hotpos">Hot layer</label><input type="range" id="hotpos" min="0" max="1" step="0.01" value="0.33"><output for="hotpos"></output></div>
+  </div>
+
+  <div class="group">
+    <h2>Warp</h2>
+    <div class="row"><label for="mass">Mass</label><input type="range" id="mass" min="0" max="0.4" step="0.005" value="0.17"><output for="mass"></output></div>
+    <div class="row"><label for="hor">Hole</label><input type="range" id="hor" min="0" max="1" step="0.01" value="0.58"><output for="hor"></output></div>
+    <div class="row"><label for="warp">Warp</label><input type="range" id="warp" min="0.2" max="3" step="0.01" value="1.7"><output for="warp"></output></div>
+    <div class="row"><label for="wfall">Warp reach</label><input type="range" id="wfall" min="0.2" max="1.5" step="0.01" value="0.52"><output for="wfall"></output></div>
+    <div class="row"><label for="inner">Inside dots</label><input type="range" id="inner" min="0" max="1" step="0.01" value="0.19"><output for="inner"></output></div>
+    <div class="row"><label for="twist">Twist</label><input type="range" id="twist" min="-3" max="3" step="0.01" value="0"><output for="twist"></output></div>
+    <div class="row"><label for="turb">Ripples</label><input type="range" id="turb" min="0" max="1" step="0.01" value="0"><output for="turb"></output></div>
+  </div>
+
+  <div class="group">
+    <h2>Camera</h2>
+    <p class="hint" style="margin:0">Drag the picture to move, scroll to zoom in on any spot.</p>
+    <div class="row"><label for="zoom">Zoom</label><input type="range" id="zoom" min="1" max="60" step="0.01" value="1"><output for="zoom"></output></div>
+    <div class="row"><label for="rot">Rotate</label><input type="range" id="rot" min="-180" max="180" step="0.5" value="0"><output for="rot"></output></div>
+    <div class="row"><label for="cx">Move X</label><input type="range" id="cx" min="-0.8" max="0.8" step="0.0001" value="0"><output for="cx"></output></div>
+    <div class="row"><label for="cy">Move Y</label><input type="range" id="cy" min="-0.8" max="0.8" step="0.0001" value="0"><output for="cy"></output></div>
+    <div class="row"><label for="fine">Fine dots</label><input type="range" id="fine" min="0" max="1" step="0.01" value="1"><output for="fine"></output></div>
+    <button type="button" id="resetView">Reset camera</button>
+  </div>
+
+  <div class="group">
+    <h2>Look</h2>
+    <div class="row"><label for="bright">Exposure</label><input type="range" id="bright" min="0.2" max="8" step="0.01" value="8"><output for="bright"></output></div>
+    <div class="row"><label for="grain">Grain</label><input type="range" id="grain" min="0" max="0.3" step="0.005" value="0.03"><output for="grain"></output></div>
+    <div class="swatches">
+      <label class="swatch" for="cBlue">Dots<input type="color" id="cBlue" value="#2c3ad6"></label>
+      <label class="swatch" for="cHot">Hot ring<input type="color" id="cHot" value="#ffc49a"></label>
+      <label class="swatch" for="cBg">Space<input type="color" id="cBg" value="#000000"></label>
+    </div>
+  </div>
+
+  <div class="group">
+    <h2>Frame</h2>
+    <div class="row"><label for="ratio">Ratio</label>
+      <select id="ratio">
+        <option value="full" selected>Full window</option>
+        <option value="1.7778">16:9</option>
+        <option value="0.5625">9:16</option>
+        <option value="1">1:1</option>
+        <option value="0.8">4:5</option>
+      </select><span></span></div>
+    <div class="row"><label for="time">Time</label><input type="range" id="time" min="0" max="3" step="0.05" value="1"><output for="time"></output></div>
+    <div class="btns2">
+      <button type="button" id="pause">Pause</button>
+      <button type="button" id="hide">Hide panel</button>
+      <button type="button" id="copy">Copy settings</button>
+      <button type="button" id="defaults">Reset</button>
+    </div>
+    <div id="exportBox" hidden>
+      <div class="group">
+        <h2>Export</h2>
+        <div class="row"><label for="exportFmt">Format</label>
+          <select id="exportFmt"><option value="png">PNG image</option><option value="gif">GIF</option><option value="mp4">MP4 video</option></select><span></span></div>
+        <div class="row"><label for="exportSize">Size</label>
+          <select id="exportSize"><option value="small">Small</option><option value="screen">Screen</option><option value="2x" selected>2x</option><option value="4k">4K</option></select><span></span></div>
+        <div class="row"><label for="exportLen">Length</label>
+          <select id="exportLen"><option value="3">3 seconds</option><option value="5" selected>5 seconds</option><option value="10">10 seconds</option></select><span></span></div>
+        <button type="button" id="export">Export</button>
+        <p class="hint" id="exportMsg" aria-live="polite"></p>
+      </div>
+    </div>
+    <button type="button" id="loadBtn">Load settings from an export</button>
+    <input type="file" id="loadFile" accept=".png,.gif,.mp4,image/png,image/gif,video/mp4" hidden>
+    <p class="hint" id="loadMsg" aria-live="polite"></p>
+    <label for="dump" hidden id="dumpLabel" class="hint">Settings (select all and copy)</label>
+    <textarea id="dump" hidden readonly rows="5" style="width:100%;font:11px var(--font-num);background:#0d1020;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px"></textarea>
+  </div>
+</form>
+
+<script src="main.js"></script>
+</body>
+</html>
