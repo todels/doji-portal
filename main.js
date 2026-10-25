@@ -194,11 +194,18 @@ const sliders = { breathe:'uBreathAmt', zoom:'uZoom', rot:'uRotDeg', cx:'uCX', c
 const colors = { cBlue:'uBlue', cHot:'uHot', cBg:'uBg' };
 const hex = h => [1,3,5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
 
+const units = { rot: '°', zoom: '×' };
+// Show as many decimals as the slider's step uses (at least 2 for fine steps), so tiny values like Spread don't read as 0.000.
+function places(el){ const s = el.step, d = (s.split('.')[1] || '').length; return +s >= 0.1 ? d : Math.max(2, d); }
 function outputs(){
   document.querySelectorAll('output').forEach(o => {
-    const el = $(o.htmlFor.value); const x = +el.value;
-    o.value = el.id === 'layers' ? String(x) : (Math.abs(x) < 0.1 && x !== 0 ? x.toFixed(3) : x.toFixed(2));
+    const el = $(o.htmlFor.value);
+    o.value = (+el.value).toFixed(places(el)) + (units[el.id] || '');
   });
+  // White fill on each slider track up to the thumb
+  document.querySelectorAll('input[type=range]').forEach(r => r.style.setProperty('--p', (r.value - r.min) / (r.max - r.min) * 100 + '%'));
+  // Hex fields mirror their color pickers, except the one being typed in
+  document.querySelectorAll('.hex').forEach(t => { if (t !== document.activeElement) t.value = $(t.dataset.for).value.toUpperCase(); });
 }
 
 let busy = false, sizeLock = false;
@@ -250,22 +257,55 @@ const presets = {
   vortex: { lw:0.99, spread:0.006, dens:1, stretch:0.51, glow:0.23, gsize:3.63, front:0, halo:1.08, fill:0.66, reach:0.5, speed:0.05, off:-0.014, layers:5, depth:1, loff:0.035, tails:0, hotamt:0.9, hotpos:0.3, mass:0.2, hor:0.1, warp:1.57, wfall:0.52, inner:0, twist:0.39, turb:0.44, bright:6.17, grain:0.03 },
   wide:   { lw:0.9, spread:0.0008, dens:1, front:1.2, halo:0.3, fill:0.1, reach:1.2, speed:0.06, off:0, layers:4, depth:0.4, loff:0.01, tails:0.3, hotamt:0.4, hotpos:0.5, mass:0.22, hor:0.3, twist:0, turb:0, bright:3 }
 };
+// The last preset clicked stays lit until a slider or color is changed by hand.
+const markPreset = name => document.querySelectorAll('[data-preset]').forEach(b => b.classList.toggle('on', b.dataset.preset === name));
 document.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('click', () => {
   Object.entries(presets[b.dataset.preset]).forEach(([k, val]) => { $(k).value = val; });
   outputs();
+  markPreset(b.dataset.preset);
 }));
 
 const panel = $('panel');
 panel.addEventListener('submit', e => e.preventDefault());
-panel.addEventListener('input', e => { if (e.target.id === 'ratio') resize(); outputs(); });
+panel.addEventListener('input', e => {
+  if (e.target.id === 'ratio') resize();
+  if (e.target.matches('input[type=range],input[type=color]')) markPreset(null);
+  outputs();
+});
 panel.addEventListener('change', e => { if (e.target.id === 'ratio') resize(); });
 
+// Typing a full hex code updates its color picker; leaving the field tidies it back up.
+document.querySelectorAll('.hex').forEach(t => {
+  const c = $(t.dataset.for);
+  t.addEventListener('input', () => { const v = '#' + t.value.trim().replace(/^#/, ''); if (/^#[0-9a-f]{6}$/i.test(v)) c.value = v.toLowerCase(); });
+  t.addEventListener('change', () => { t.value = c.value.toUpperCase(); });
+});
+
 let paused = false;
-$('resetView').addEventListener('click', () => { $('zoom').value = 1; $('rot').value = 0; $('cx').value = 0; $('cy').value = 0; outputs(); panel.dispatchEvent(new Event('input')); });
-$('pause').addEventListener('click', () => { paused = !paused; $('pause').textContent = paused ? 'Play' : 'Pause'; });
+$('animate').addEventListener('change', () => { paused = !$('animate').checked; });
 function setHidden(h){ panel.hidden = h; $('show').hidden = !h; }
-$('hide').addEventListener('click', () => setHidden(true));
 $('show').addEventListener('click', () => setHidden(false));
+
+// ---- Collapsing: the whole panel and each section, remembered between visits ----
+const UI_KEY = 'doji-portal-ui-v1';
+let ui = {};
+try { ui = JSON.parse(localStorage.getItem(UI_KEY) || '{}') || {}; } catch (e) {}
+function saveUI(){ try { localStorage.setItem(UI_KEY, JSON.stringify(ui)); } catch (e) {} }
+function setPanelOpen(open){ panel.classList.toggle('closed', !open); $('collapse').setAttribute('aria-expanded', open); $('collapse').setAttribute('aria-label', open ? 'Collapse panel' : 'Expand panel'); }
+setPanelOpen(ui.panel ?? true);
+panel.querySelector('.panel-head').addEventListener('click', e => {
+  if (e.target.closest('#defaults')) return;
+  ui.panel = panel.classList.contains('closed'); setPanelOpen(ui.panel); saveUI();
+});
+document.querySelectorAll('.sec[data-sec]').forEach(sec => {
+  const id = sec.dataset.sec, btn = sec.querySelector('[data-collapse]');
+  const set = open => { sec.classList.toggle('closed', !open); btn.setAttribute('aria-expanded', open); };
+  set(ui[id] ?? !sec.hasAttribute('data-closed'));
+  sec.querySelector('.sec-head').addEventListener('click', e => {
+    if (e.target.closest('[data-reset]')) return;
+    ui[id] = sec.classList.contains('closed'); set(ui[id]); saveUI();
+  });
+});
 window.addEventListener('keydown', e => {
   if (e.key && e.key.toLowerCase() === 'h' && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) setHidden(!panel.hidden);
 });
@@ -274,19 +314,25 @@ if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { $('time').v
 
 const KEY='doji-portal-settings-v2';
 const defaultsAll={};
-panel.querySelectorAll('input,select').forEach(el=>{ if(el.id) defaultsAll[el.id]=el.value; });
+panel.querySelectorAll('input[type=range],input[type=color],select').forEach(el=>{ if(el.id) defaultsAll[el.id]=el.value; });
 function current(){ const o={}; panel.querySelectorAll('input[type=range],input[type=color],select').forEach(el=>{ if(el.id) o[el.id]=el.value; }); return o; }
-function apply(o){ Object.entries(o||{}).forEach(([k,v])=>{ const el=$(k); if(el && el.tagName!=='TEXTAREA') el.value=v; }); outputs(); resize(); }
+function apply(o){ Object.entries(o||{}).forEach(([k,v])=>{ const el=$(k); if(el && el.tagName!=='TEXTAREA') el.value=v; }); outputs(); resize(); syncExportUI(); }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(current())); }catch(e){} }
 try{ const saved=JSON.parse(localStorage.getItem(KEY)||'null'); if(saved) apply(saved); }catch(e){}
 panel.addEventListener('input', save);
 panel.addEventListener('change', save);
 document.querySelectorAll('[data-preset]').forEach(b=>b.addEventListener('click', save));
-$('defaults').addEventListener('click', ()=>{ apply(defaultsAll); save(); });
+$('defaults').addEventListener('click', ()=>{ apply(defaultsAll); save(); markPreset(null); });
+// Each section's reset puts just that section's controls back to their defaults.
+document.querySelectorAll('[data-reset]').forEach(b=>b.addEventListener('click', ()=>{
+  const o={}; b.closest('.sec').querySelectorAll('input[type=range],input[type=color],select').forEach(el=>{ o[el.id]=defaultsAll[el.id]; });
+  apply(o); save(); markPreset(null);
+}));
 $('copy').addEventListener('click', ()=>{
   const txt=JSON.stringify(current());
+  const lbl=$('copy').querySelector('span');
   const show=()=>{ $('dump').hidden=false; $('dumpLabel').hidden=false; $('dump').value=txt; $('dump').focus(); $('dump').select(); };
-  try{ navigator.clipboard.writeText(txt).then(()=>{ $('copy').textContent='Copied'; setTimeout(()=>{$('copy').textContent='Copy settings';},1500); }, show); }catch(e){ show(); }
+  try{ navigator.clipboard.writeText(txt).then(()=>{ lbl.textContent='Copied'; setTimeout(()=>{lbl.textContent='Copy settings';},1500); }, show); }catch(e){ show(); }
 });
 
 outputs(); resize();
@@ -367,11 +413,15 @@ $('loadFile').addEventListener('change', async () => {
   if (!f) return;
   const say = t => { $('loadMsg').textContent = t; };
   try {
-    const s = new TextDecoder('latin1').decode(new Uint8Array(await f.arrayBuffer()));
+    const bytes = new Uint8Array(await f.arrayBuffer());
+    const s = new TextDecoder('latin1').decode(bytes);
     const a = s.lastIndexOf(MARK_A), b = s.indexOf(MARK_B, a);
-    if (a < 0 || b < 0) { say('No Doji settings found in that file. Only files exported from here carry them.'); return; }
-    const data = JSON.parse(s.slice(a + MARK_A.length, b));
-    apply(data.settings); save();
+    let settings = null;
+    if (a >= 0 && b >= 0) settings = JSON.parse(s.slice(a + MARK_A.length, b)).settings;
+    // A .json file holding what "Copy settings" puts on the clipboard
+    else if (/\.json$/i.test(f.name)) { const j = JSON.parse(new TextDecoder().decode(bytes)); settings = j.settings || j; }
+    if (!settings) { say('No Doji settings found in that file. Only files exported from here carry them.'); return; }
+    apply(settings); save(); markPreset(null);
     say('Loaded the settings from ' + f.name + '.');
   } catch (e) { say('Could not read settings from that file.'); }
 });
@@ -512,6 +562,10 @@ $('export').addEventListener('click', async () => {
   } catch (e) { msg('Export failed.'); console.error(e); }
   exporting = false; $('export').disabled = false;
 });
-function syncExportUI(){ $('exportLen').closest('.row').hidden = $('exportFmt').value === 'png'; }
+function syncExportUI(){
+  const f = $('exportFmt').value;
+  $('exportLen').closest('.field').hidden = f === 'png';
+  $('export').querySelector('span').textContent = 'Export ' + f.toUpperCase();
+}
 $('exportFmt').addEventListener('change', syncExportUI); syncExportUI();
 })();

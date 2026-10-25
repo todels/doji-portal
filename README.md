@@ -22,6 +22,6 @@ npx serve .
 
 ## Export
 
-PNG, GIF and MP4 export are built in. Every exported file carries the settings it was made with, and "Load settings from an export" restores them.
+PNG, GIF and MP4 export are built in. Every exported file carries the settings it was made with, and "Import settings" restores them (it also takes a .json of what "Copy settings" copies).
 
 GIF export loads `gifenc` and MP4 export loads `mp4-muxer` from jsDelivr on demand, so those need an internet connection.
