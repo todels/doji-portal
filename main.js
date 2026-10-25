@@ -283,7 +283,7 @@ document.querySelectorAll('.hex').forEach(t => {
 
 let paused = false;
 $('animate').addEventListener('change', () => { paused = !$('animate').checked; });
-function setHidden(h){ panel.hidden = h; $('show').hidden = !h; }
+function setHidden(h){ panel.hidden = h; $('brand').hidden = h; $('show').hidden = !h; }
 $('show').addEventListener('click', () => setHidden(false));
 
 // ---- Collapsing: the whole panel and each section, remembered between visits ----

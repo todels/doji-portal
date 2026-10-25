@@ -28,6 +28,15 @@ body{margin:0;background:var(--stage);color:var(--ink);font:13px/1.35 var(--font
 .stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
 #gl{display:block;background:#000}
 
+/* Brand: logo in a square outline frame, name beside it. Clicks pass through to the canvas. */
+.brand{
+  position:fixed;top:calc(16px + env(safe-area-inset-top,0px));left:max(16px,env(safe-area-inset-left,0px));
+  display:flex;align-items:center;gap:10px;margin:0;pointer-events:none;
+  font-size:14px;font-weight:600;letter-spacing:-0.006em;color:var(--ink);
+}
+.logo{display:grid;place-items:center;width:34px;aspect-ratio:1;border:1px solid rgba(255,255,255,0.22);border-radius:8px;background:none}
+.logo svg{width:16px;height:auto;fill:currentColor}
+
 /* Panel shell: header stays put, body scrolls */
 .panel{
   position:fixed;
@@ -40,7 +49,7 @@ body{margin:0;background:var(--stage);color:var(--ink);font:13px/1.35 var(--font
 }
 .panel-head,.sec-head{display:flex;align-items:center;gap:2px;cursor:pointer;user-select:none;-webkit-user-select:none}
 .panel-head{padding:10px 10px 10px 16px;min-height:50px}
-.panel-head h1{margin:0 auto 0 0;font-size:14px;font-weight:600;letter-spacing:-0.006em}
+.panel-head h2{margin:0 auto 0 0;font-size:14px;font-weight:600;letter-spacing:-0.006em}
 .panel-body{overflow:auto;overscroll-behavior:contain;border-top:1px solid var(--divider);scrollbar-width:thin;scrollbar-color:#3a3a3e transparent}
 .panel.closed .panel-body{display:none}
 .panel.closed .panel-head .chev{transform:rotate(180deg)}
