@@ -213,13 +213,13 @@ function outputs(){
   });
   // White fill on each slider track up to the thumb
   document.querySelectorAll('input[type=range]').forEach(r => r.style.setProperty('--p', (r.value - r.min) / (r.max - r.min) * 100 + '%'));
-  // Swatch groups mark the picked color and show its name
-  document.querySelectorAll('.swatches').forEach(g => {
-    const v = $(g.dataset.for).value.toLowerCase();
-    g.querySelectorAll('button').forEach(b => b.setAttribute('aria-checked', b.dataset.color === v));
-    const hit = PALETTE.find(p => p[1] === v);
-    document.querySelector('.cname[data-for=' + g.dataset.for + ']').textContent = hit ? hit[0] : '';
+  // Color fields show just the picked swatch and its name
+  document.querySelectorAll('.cpick').forEach(b => {
+    const v = $(b.dataset.for).value.toLowerCase(), hit = PALETTE.find(p => p[1] === v);
+    b.querySelector('.sw i').style.background = v;
+    b.querySelector('.cname').textContent = hit ? hit[0] : v.toUpperCase();
   });
+  if (popFor) markSwatches();
 }
 
 let busy = false, sizeLock = false;
@@ -288,17 +288,48 @@ panel.addEventListener('input', e => {
 });
 panel.addEventListener('change', e => { if (e.target.id === 'ratio') resize(); });
 
-// Each color comes from this palette (a row of blues, a row of golds); the hidden color inputs hold the pick.
-document.querySelectorAll('.swatches').forEach(g => {
-  const input = $(g.dataset.for);
-  for (const [name, c] of PALETTE) {
-    const b = document.createElement('button');
-    b.type = 'button'; b.title = name; b.dataset.color = c; b.style.background = c;
-    b.setAttribute('role', 'radio'); b.setAttribute('aria-label', name);
-    b.addEventListener('click', () => { input.value = c; input.dispatchEvent(new Event('input', { bubbles: true })); });
-    g.appendChild(b);
-  }
+// ---- Color fields: click one to pick from the palette (a row of blues, a row of golds) in a popover ----
+// The hidden color inputs hold the pick; the popover is shared and sits outside the panel so nothing clips it.
+const pop = $('cpop'), swatchGrid = pop.querySelector('.swatches');
+let popFor = null;
+function markSwatches(){ const v = $(popFor.dataset.for).value.toLowerCase(); swatchGrid.querySelectorAll('button').forEach(b => b.setAttribute('aria-checked', b.dataset.color === v)); }
+function placePop(){
+  const r = popFor.getBoundingClientRect(), pw = pop.offsetWidth, ph = pop.offsetHeight;
+  let left = r.left; if (left + pw > innerWidth - 8) left = r.right - pw;
+  let top = r.bottom + 6; if (top + ph > innerHeight - 8) top = r.top - ph - 6;
+  pop.style.left = Math.max(8, left) + 'px'; pop.style.top = Math.max(8, top) + 'px';
+}
+function openPop(btn){
+  closePop();
+  popFor = btn; btn.setAttribute('aria-expanded', 'true');
+  pop.setAttribute('aria-label', document.getElementById('l-' + btn.dataset.for).textContent);
+  markSwatches(); pop.hidden = false; placePop();
+  (swatchGrid.querySelector('[aria-checked=true]') || swatchGrid.querySelector('button')).focus();
+}
+function closePop(refocus){
+  if (!popFor) return;
+  const btn = popFor; popFor = null; pop.hidden = true; btn.setAttribute('aria-expanded', 'false');
+  if (refocus) btn.focus();
+}
+for (const [name, c] of PALETTE) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.title = name; b.dataset.color = c; b.style.background = c;
+  b.setAttribute('role', 'radio'); b.setAttribute('aria-label', name);
+  b.addEventListener('click', () => { const input = $(popFor.dataset.for); input.value = c; input.dispatchEvent(new Event('input', { bubbles: true })); closePop(true); });
+  swatchGrid.appendChild(b);
+}
+document.querySelectorAll('.cpick').forEach(b => b.addEventListener('click', () => { if (popFor === b) closePop(); else openPop(b); }));
+document.addEventListener('pointerdown', e => { if (popFor && !pop.contains(e.target) && !popFor.contains(e.target)) closePop(); });
+pop.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { e.stopPropagation(); closePop(true); return; }
+  // Arrow keys walk the 8-wide grid
+  const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -8, ArrowDown: 8 }[e.key];
+  if (!step) return;
+  const all = [...swatchGrid.children], i = all.indexOf(document.activeElement);
+  if (i >= 0 && all[i + step]) { e.preventDefault(); all[i + step].focus(); }
 });
+$('panelBody').addEventListener('scroll', () => closePop());
+window.addEventListener('resize', () => closePop());
 // Colors from older saves or imports snap to the closest palette color.
 function nearest(v){
   const c = hex(v); let best = PALETTE[0][1], bd = Infinity;
@@ -308,7 +339,7 @@ function nearest(v){
 
 let paused = false;
 $('animate').addEventListener('change', () => { paused = !$('animate').checked; });
-function setHidden(h){ panel.hidden = h; $('brand').hidden = h; $('show').hidden = !h; }
+function setHidden(h){ closePop(); panel.hidden = h; $('brand').hidden = h; $('show').hidden = !h; }
 $('show').addEventListener('click', () => setHidden(false));
 
 // ---- Collapsing: the whole panel and each section, remembered between visits ----

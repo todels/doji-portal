@@ -116,12 +116,24 @@ select{
 select:hover{border-color:var(--border-hover)}
 option{background:#1c1c1e;color:var(--ink)}
 
-/* Color: a fixed palette, blues on the first row and golds on the second */
-.cname{color:var(--value);font-size:12.5px}
+/* Color field: the picked swatch and its name; clicking opens the palette popover */
+.cpick{
+  display:flex;align-items:center;width:100%;height:34px;padding:0 10px 0 0;font-size:13px;color:var(--ink);text-align:left;
+  background:var(--field);border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;
+}
+.cpick:hover{border-color:var(--border-hover)}
+.cpick[aria-expanded=true]{border-color:var(--accent)}
+.cpick .sw{display:grid;place-items:center;width:34px;height:100%;flex:none;border-right:1px solid var(--border)}
+.cpick .sw i{width:16px;height:16px;border-radius:4px;border:1px solid rgba(255,255,255,0.18)}
+.cpick .cname{flex:1;min-width:0;padding-left:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cpick .ic{width:14px;height:14px;color:var(--value);transform:rotate(180deg)}
+
+/* Palette popover: blues on the first row, golds on the second */
+.cpop{position:fixed;z-index:10;width:272px;padding:10px;background:#161617;border:1px solid var(--border);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,0.55)}
 .swatches{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px}
 .swatches button{aspect-ratio:1;padding:0;border:1px solid rgba(255,255,255,0.12);border-radius:6px;cursor:pointer;transition:transform .1s}
 .swatches button:hover{transform:scale(1.08)}
-.swatches button[aria-checked=true]{box-shadow:0 0 0 2px #111112,0 0 0 3.5px #ffffff}
+.swatches button[aria-checked=true]{box-shadow:0 0 0 2px #161617,0 0 0 3.5px #ffffff}
 
 /* Switch */
 .switch{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink);cursor:pointer;width:max-content}

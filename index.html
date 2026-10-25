@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
 <!-- Bump ?v= on every deploy: GitHub Pages lets browsers cache files for 10 minutes, and this keeps a fresh page from pairing with stale CSS/JS. -->
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -170,12 +170,14 @@
         <button type="button" class="icon box" data-collapse aria-expanded="true" aria-controls="b-look" aria-labelledby="h-look"><svg class="ic chev"><use href="#i-chev"/></svg></button>
       </div>
       <div class="sec-body" id="b-look"><div class="sec-in">
-        <div class="field"><div class="lab"><span class="flabel" id="l-cBlue">Dots color</span><span class="cname" data-for="cBlue"></span></div>
-          <input type="color" id="cBlue" value="#2c3ad6" hidden>
-          <div class="swatches" role="radiogroup" aria-labelledby="l-cBlue" data-for="cBlue"></div></div>
-        <div class="field"><div class="lab"><span class="flabel" id="l-cHot">Hot ring color</span><span class="cname" data-for="cHot"></span></div>
-          <input type="color" id="cHot" value="#ffc49a" hidden>
-          <div class="swatches" role="radiogroup" aria-labelledby="l-cHot" data-for="cHot"></div></div>
+        <div class="two">
+          <div class="field"><span class="flabel" id="l-cBlue">Dots color</span>
+            <input type="color" id="cBlue" value="#2c3ad6" hidden>
+            <button type="button" class="cpick" data-for="cBlue" aria-haspopup="dialog" aria-expanded="false" aria-controls="cpop" aria-labelledby="l-cBlue n-cBlue"><span class="sw"><i></i></span><span class="cname" id="n-cBlue"></span><svg class="ic"><use href="#i-chev"/></svg></button></div>
+          <div class="field"><span class="flabel" id="l-cHot">Hot ring color</span>
+            <input type="color" id="cHot" value="#ffc49a" hidden>
+            <button type="button" class="cpick" data-for="cHot" aria-haspopup="dialog" aria-expanded="false" aria-controls="cpop" aria-labelledby="l-cHot n-cHot"><span class="sw"><i></i></span><span class="cname" id="n-cHot"></span><svg class="ic"><use href="#i-chev"/></svg></button></div>
+        </div>
         <div class="field"><div class="lab"><label for="bright">Exposure</label><output for="bright"></output></div><input type="range" id="bright" min="0.2" max="8" step="0.01" value="8"></div>
         <div class="field"><div class="lab"><label for="glow">Glow dots</label><output for="glow"></output></div><input type="range" id="glow" min="0" max="1" step="0.01" value="0.23"></div>
         <div class="field"><div class="lab"><label for="gsize">Glow size</label><output for="gsize"></output></div><input type="range" id="gsize" min="0.5" max="4" step="0.01" value="3.63"></div>
@@ -209,6 +211,9 @@
   </div>
 </form>
 
-<script src="main.js?v=4"></script>
+<!-- Color palette popover; lives outside the panel so the panel's scrolling and blur don't clip it -->
+<div class="cpop" id="cpop" role="dialog" aria-label="Choose a color" hidden><div class="swatches" role="radiogroup"></div></div>
+
+<script src="main.js?v=5"></script>
 </body>
 </html>
