@@ -116,15 +116,12 @@ select{
 select:hover{border-color:var(--border-hover)}
 option{background:#1c1c1e;color:var(--ink)}
 
-/* Color: swatch + hex field */
-.color{display:flex;align-items:center;height:34px;background:var(--field);border:1px solid var(--border);border-radius:8px;overflow:hidden}
-.color:hover{border-color:var(--border-hover)}
-.color .sw{display:grid;place-items:center;width:34px;height:100%;flex:none;border-right:1px solid var(--border)}
-input[type=color]{-webkit-appearance:none;appearance:none;width:16px;height:16px;padding:0;border:1px solid rgba(255,255,255,0.18);border-radius:4px;background:none;cursor:pointer}
-input[type=color]::-webkit-color-swatch-wrapper{padding:0}
-input[type=color]::-webkit-color-swatch{border:0;border-radius:3px}
-input[type=color]::-moz-color-swatch{border:0;border-radius:3px}
-.hex{flex:1;min-width:0;height:100%;padding:0 10px;font-size:13px;color:var(--ink);background:transparent;border:0;outline:0;font-variant-numeric:tabular-nums}
+/* Color: a fixed palette, blues on the first row and golds on the second */
+.cname{color:var(--value);font-size:12.5px}
+.swatches{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px}
+.swatches button{aspect-ratio:1;padding:0;border:1px solid rgba(255,255,255,0.12);border-radius:6px;cursor:pointer;transition:transform .1s}
+.swatches button:hover{transform:scale(1.08)}
+.swatches button[aria-checked=true]{box-shadow:0 0 0 2px #111112,0 0 0 3.5px #ffffff}
 
 /* Switch */
 .switch{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink);cursor:pointer;width:max-content}
@@ -145,8 +142,6 @@ input[type=range]::-moz-range-thumb{width:12px;height:12px;border:0;border-radiu
 textarea#dump{width:100%;font:11px/1.4 var(--font-num);color:var(--ink);background:var(--field);border:1px solid var(--border);border-radius:8px;padding:8px;resize:vertical}
 
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.color:focus-within{border-color:var(--accent)}
-.hex:focus-visible{outline:0}
 
 .show{
   position:fixed;top:calc(16px + env(safe-area-inset-top,0px));right:max(16px,env(safe-area-inset-right,0px));

@@ -16,7 +16,8 @@ float gL=0.0;
 uniform float uLW,uSpread,uDens,uFront,uHalo,uFill,uPhase,uOff,uReach;
 uniform float uLayers,uDepth,uLOff,uHotAmt,uHotPos,uTails;
 uniform float uMass,uHor,uTwist,uTurb,uBright,uGrain;
-uniform vec3 uBlue,uHot,uBg;
+uniform vec3 uBlue,uHot;
+uniform float uAlpha;
 
 float h21(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
 float h31(vec3 p){p=fract(p*0.3183099+0.1);p*=17.0;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
@@ -159,10 +160,11 @@ void main(){
     col+=stream(sc,uOff,977.0,fw,uBlue)*uFront;
   }
 
-  col+=uBg;
   col=1.0-exp(-col*uBright);
   col*=1.0+(h21(gl_FragCoord.xy+fract(uT*13.7)*100.0)-0.5)*uGrain*3.0;
-  o=vec4(col,1.0);
+  col=clamp(col,0.0,1.0);
+  // Transparent export: the light becomes its own alpha (premultiplied), so it lands exactly like this over black.
+  o=vec4(col,uAlpha>0.5?max(col.r,max(col.g,col.b)):1.0);
 }`;
 
 const canvas = document.getElementById('gl');
@@ -191,8 +193,15 @@ const $ = id => document.getElementById(id);
 const sliders = { breathe:'uBreathAmt', zoom:'uZoom', rot:'uRotDeg', cx:'uCX', cy:'uCY', fine:'uFine', corebend:'uCoreBend', stretch:'uStretch', warp:'uWarp', wfall:'uWFall', inner:'uInner', glow:'uGlowAmt', gsize:'uGlowSize', lw:'uLW', spread:'uSpread', dens:'uDens', front:'uFront', halo:'uHalo', fill:'uFill', off:'uOff', reach:'uReach',
   layers:'uLayers', depth:'uDepth', loff:'uLOff', tails:'uTails', hotamt:'uHotAmt', hotpos:'uHotPos',
   mass:'uMass', hor:'uHor', twist:'uTwist', turb:'uTurb', bright:'uBright', grain:'uGrain' };
-const colors = { cBlue:'uBlue', cHot:'uHot', cBg:'uBg' };
+const colors = { cBlue:'uBlue', cHot:'uHot' };
 const hex = h => [1,3,5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
+// The only colors on offer: eight blues, then eight golds, dark to light.
+const PALETTE = [
+  ['Midnight', '#1a2a9c'], ['Doji', '#2c3ad6'], ['Royal', '#3550ff'], ['Cobalt', '#2f6bff'],
+  ['Azure', '#3d8bff'], ['Sky', '#5aa8ff'], ['Ice', '#8cc4ff'], ['Glacier', '#b5dcff'],
+  ['Bronze', '#b8762e'], ['Amber', '#e09a3a'], ['Gold', '#f2b84b'], ['Honey', '#ffc96b'],
+  ['Glow', '#ffc49a'], ['Sand', '#ffd9a0'], ['Champagne', '#ffe7c2'], ['Ivory', '#fff3dd']
+];
 
 const units = { rot: '°', zoom: '×' };
 // Show as many decimals as the slider's step uses (at least 2 for fine steps), so tiny values like Spread don't read as 0.000.
@@ -204,8 +213,13 @@ function outputs(){
   });
   // White fill on each slider track up to the thumb
   document.querySelectorAll('input[type=range]').forEach(r => r.style.setProperty('--p', (r.value - r.min) / (r.max - r.min) * 100 + '%'));
-  // Hex fields mirror their color pickers, except the one being typed in
-  document.querySelectorAll('.hex').forEach(t => { if (t !== document.activeElement) t.value = $(t.dataset.for).value.toUpperCase(); });
+  // Swatch groups mark the picked color and show its name
+  document.querySelectorAll('.swatches').forEach(g => {
+    const v = $(g.dataset.for).value.toLowerCase();
+    g.querySelectorAll('button').forEach(b => b.setAttribute('aria-checked', b.dataset.color === v));
+    const hit = PALETTE.find(p => p[1] === v);
+    document.querySelector('.cname[data-for=' + g.dataset.for + ']').textContent = hit ? hit[0] : '';
+  });
 }
 
 let busy = false, sizeLock = false;
@@ -274,12 +288,23 @@ panel.addEventListener('input', e => {
 });
 panel.addEventListener('change', e => { if (e.target.id === 'ratio') resize(); });
 
-// Typing a full hex code updates its color picker; leaving the field tidies it back up.
-document.querySelectorAll('.hex').forEach(t => {
-  const c = $(t.dataset.for);
-  t.addEventListener('input', () => { const v = '#' + t.value.trim().replace(/^#/, ''); if (/^#[0-9a-f]{6}$/i.test(v)) c.value = v.toLowerCase(); });
-  t.addEventListener('change', () => { t.value = c.value.toUpperCase(); });
+// Each color comes from this palette (a row of blues, a row of golds); the hidden color inputs hold the pick.
+document.querySelectorAll('.swatches').forEach(g => {
+  const input = $(g.dataset.for);
+  for (const [name, c] of PALETTE) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.title = name; b.dataset.color = c; b.style.background = c;
+    b.setAttribute('role', 'radio'); b.setAttribute('aria-label', name);
+    b.addEventListener('click', () => { input.value = c; input.dispatchEvent(new Event('input', { bubbles: true })); });
+    g.appendChild(b);
+  }
 });
+// Colors from older saves or imports snap to the closest palette color.
+function nearest(v){
+  const c = hex(v); let best = PALETTE[0][1], bd = Infinity;
+  for (const [, p] of PALETTE) { const q = hex(p), d = (c[0] - q[0]) ** 2 + (c[1] - q[1]) ** 2 + (c[2] - q[2]) ** 2; if (d < bd) { bd = d; best = p; } }
+  return best;
+}
 
 let paused = false;
 $('animate').addEventListener('change', () => { paused = !$('animate').checked; });
@@ -316,7 +341,7 @@ const KEY='doji-portal-settings-v2';
 const defaultsAll={};
 panel.querySelectorAll('input[type=range],input[type=color],select').forEach(el=>{ if(el.id) defaultsAll[el.id]=el.value; });
 function current(){ const o={}; panel.querySelectorAll('input[type=range],input[type=color],select').forEach(el=>{ if(el.id) o[el.id]=el.value; }); return o; }
-function apply(o){ Object.entries(o||{}).forEach(([k,v])=>{ const el=$(k); if(el && el.tagName!=='TEXTAREA') el.value=v; }); outputs(); resize(); syncExportUI(); }
+function apply(o){ Object.entries(o||{}).forEach(([k,v])=>{ const el=$(k); if(el && el.tagName!=='TEXTAREA') el.value=v; }); Object.keys(colors).forEach(id=>{ $(id).value=nearest($(id).value); }); outputs(); resize(); syncExportUI(); }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(current())); }catch(e){} }
 try{ const saved=JSON.parse(localStorage.getItem(KEY)||'null'); if(saved) apply(saved); }catch(e){}
 panel.addEventListener('input', save);
@@ -442,8 +467,10 @@ const tick = () => new Promise(r => setTimeout(r, 0));
 
 async function exportPNG(){
   const [w, h] = target(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE));
+  gl.uniform1f(u('uAlpha'), $('transparent').checked ? 1 : 0);
   setSize(w, h); draw();
   const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+  gl.uniform1f(u('uAlpha'), 0);
   resize();
   if (blob) await saveFile('doji-portal-' + w + 'x' + h + '.png', blob); else msg('Export failed.');
 }
@@ -565,6 +592,7 @@ $('export').addEventListener('click', async () => {
 function syncExportUI(){
   const f = $('exportFmt').value;
   $('exportLen').closest('.field').hidden = f === 'png';
+  $('transparent').closest('.switch').hidden = f !== 'png';
   $('export').querySelector('span').textContent = 'Export ' + f.toUpperCase();
 }
 $('exportFmt').addEventListener('change', syncExportUI); syncExportUI();

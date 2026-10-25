@@ -7,7 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="style.css">
+<!-- Bump ?v= on every deploy: GitHub Pages lets browsers cache files for 10 minutes, and this keeps a fresh page from pairing with stale CSS/JS. -->
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -70,17 +71,14 @@
       </div>
       <div class="sec-body" id="b-canvas"><div class="sec-in">
         <label class="switch"><input type="checkbox" id="animate" role="switch" checked>Animate</label>
-        <div class="two">
-          <div class="field"><label class="flabel" for="cBgHex">Space color</label><div class="color"><span class="sw"><input type="color" id="cBg" value="#000000" aria-label="Space color picker"></span><input type="text" class="hex" id="cBgHex" data-for="cBg" spellcheck="false" maxlength="7"></div></div>
-          <div class="field"><label class="flabel" for="ratio">Aspect ratio</label>
-            <select id="ratio">
-              <option value="full" selected>Full window</option>
-              <option value="1.7778">16:9</option>
-              <option value="0.5625">9:16</option>
-              <option value="1">1:1</option>
-              <option value="0.8">4:5</option>
-            </select></div>
-        </div>
+        <div class="field"><label class="flabel" for="ratio">Aspect ratio</label>
+          <select id="ratio">
+            <option value="full" selected>Full window</option>
+            <option value="1.7778">16:9</option>
+            <option value="0.5625">9:16</option>
+            <option value="1">1:1</option>
+            <option value="0.8">4:5</option>
+          </select></div>
         <div class="field"><div class="lab"><label for="time">Time</label><output for="time"></output></div><input type="range" id="time" min="0" max="3" step="0.05" value="1"></div>
       </div></div>
     </section>
@@ -172,10 +170,12 @@
         <button type="button" class="icon box" data-collapse aria-expanded="true" aria-controls="b-look" aria-labelledby="h-look"><svg class="ic chev"><use href="#i-chev"/></svg></button>
       </div>
       <div class="sec-body" id="b-look"><div class="sec-in">
-        <div class="two">
-          <div class="field"><label class="flabel" for="cBlueHex">Dots color</label><div class="color"><span class="sw"><input type="color" id="cBlue" value="#2c3ad6" aria-label="Dots color picker"></span><input type="text" class="hex" id="cBlueHex" data-for="cBlue" spellcheck="false" maxlength="7"></div></div>
-          <div class="field"><label class="flabel" for="cHotHex">Hot ring color</label><div class="color"><span class="sw"><input type="color" id="cHot" value="#ffc49a" aria-label="Hot ring color picker"></span><input type="text" class="hex" id="cHotHex" data-for="cHot" spellcheck="false" maxlength="7"></div></div>
-        </div>
+        <div class="field"><div class="lab"><span class="flabel" id="l-cBlue">Dots color</span><span class="cname" data-for="cBlue"></span></div>
+          <input type="color" id="cBlue" value="#2c3ad6" hidden>
+          <div class="swatches" role="radiogroup" aria-labelledby="l-cBlue" data-for="cBlue"></div></div>
+        <div class="field"><div class="lab"><span class="flabel" id="l-cHot">Hot ring color</span><span class="cname" data-for="cHot"></span></div>
+          <input type="color" id="cHot" value="#ffc49a" hidden>
+          <div class="swatches" role="radiogroup" aria-labelledby="l-cHot" data-for="cHot"></div></div>
         <div class="field"><div class="lab"><label for="bright">Exposure</label><output for="bright"></output></div><input type="range" id="bright" min="0.2" max="8" step="0.01" value="8"></div>
         <div class="field"><div class="lab"><label for="glow">Glow dots</label><output for="glow"></output></div><input type="range" id="glow" min="0" max="1" step="0.01" value="0.23"></div>
         <div class="field"><div class="lab"><label for="gsize">Glow size</label><output for="gsize"></output></div><input type="range" id="gsize" min="0.5" max="4" step="0.01" value="3.63"></div>
@@ -197,6 +197,7 @@
           <div class="field"><label class="flabel" for="exportSize">Resolution</label>
             <select id="exportSize"><option value="small">Small</option><option value="screen">Screen</option><option value="2x" selected>2x</option><option value="4k">4K</option></select></div>
         </div>
+        <label class="switch"><input type="checkbox" id="transparent" role="switch">Transparent background</label>
         <div class="field"><label class="flabel" for="exportLen">Length</label>
           <select id="exportLen"><option value="3">3 seconds</option><option value="5" selected>5 seconds</option><option value="10">10 seconds</option></select></div>
         <button type="button" class="btn primary" id="export"><svg class="ic"><use href="#i-export"/></svg><span>Export PNG</span></button>
@@ -208,6 +209,6 @@
   </div>
 </form>
 
-<script src="main.js"></script>
+<script src="main.js?v=4"></script>
 </body>
 </html>
