@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
 <!-- Bump ?v= on every deploy: GitHub Pages lets browsers cache files for 10 minutes, and this keeps a fresh page from pairing with stale CSS/JS. -->
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -41,7 +41,7 @@
         <button type="button" class="btn" id="loadBtn"><svg class="ic"><use href="#i-import"/></svg><span>Import settings</span></button>
         <button type="button" class="btn" id="copy"><svg class="ic"><use href="#i-copy"/></svg><span>Copy settings</span></button>
       </div>
-      <input type="file" id="loadFile" accept=".png,.gif,.mp4,.json,image/png,image/gif,video/mp4,application/json" hidden>
+      <input type="file" id="loadFile" accept=".png,.gif,.mp4,.json,.html,image/png,image/gif,video/mp4,application/json,text/html" hidden>
       <p class="hint" id="loadMsg" aria-live="polite"></p>
       <label for="dump" hidden id="dumpLabel" class="hint">Settings (select all and copy)</label>
       <textarea id="dump" hidden readonly rows="5"></textarea>
@@ -57,8 +57,9 @@
           <button type="button" data-preset="doji">Doji</button>
           <button type="button" data-preset="clean">Clean</button>
           <button type="button" data-preset="vortex">Vortex</button>
-          <button type="button" data-preset="wide">Wide</button>
+          <button type="button" data-preset="side">Side</button>
           <button type="button" data-preset="contour">Contour</button>
+          <button type="button" data-preset="star">Star</button>
         </div>
       </div></div>
     </section>
@@ -94,6 +95,8 @@
         <div class="field"><div class="lab"><label for="dens">Dots</label><output for="dens"></output></div><input type="range" id="dens" min="0" max="1" step="0.01" value="1"></div>
         <div class="field"><div class="lab"><label for="spread">Spread</label><output for="spread"></output></div><input type="range" id="spread" min="0.0002" max="0.02" step="0.0001" value="0.0002"></div>
         <div class="field"><div class="lab"><label for="stretch">Stretch</label><output for="stretch"></output></div><input type="range" id="stretch" min="0" max="1" step="0.01" value="0.49"></div>
+        <div class="field"><label class="flabel" for="smode">Stretch type</label>
+          <select id="smode"><option value="0" selected>Along ring</option><option value="1">Trail</option></select></div>
         <div class="field"><div class="lab"><label for="speed">Speed</label><output for="speed"></output></div><input type="range" id="speed" min="0" max="1" step="0.01" value="0.08"></div>
         <div class="field"><div class="lab"><label for="off">Offset</label><output for="off"></output></div><input type="range" id="off" min="-0.05" max="0.05" step="0.001" value="0"></div>
       </div></div>
@@ -148,6 +151,19 @@
       </div></div>
     </section>
 
+    <section class="sec" data-sec="mouse">
+      <div class="sec-head">
+        <h2 id="h-mouse">Mouse</h2>
+        <button type="button" class="icon" data-reset title="Reset mouse" aria-label="Reset mouse"><svg class="ic"><use href="#i-reset"/></svg></button>
+        <button type="button" class="icon box" data-collapse aria-expanded="true" aria-controls="b-mouse" aria-labelledby="h-mouse"><svg class="ic chev"><use href="#i-chev"/></svg></button>
+      </div>
+      <div class="sec-body" id="b-mouse"><div class="sec-in">
+        <div class="field"><div class="lab"><label for="mstr">Strength</label><output for="mstr"></output></div><input type="range" id="mstr" min="0" max="1" step="0.01" value="0.5"></div>
+        <div class="field"><div class="lab"><label for="msize">Size</label><output for="msize"></output></div><input type="range" id="msize" min="0.02" max="0.3" step="0.005" value="0.09"></div>
+        <div class="field"><div class="lab"><label for="msettle">Settle</label><output for="msettle"></output></div><input type="range" id="msettle" min="0.1" max="3" step="0.05" value="0.8"></div>
+      </div></div>
+    </section>
+
     <section class="sec" data-sec="camera" data-closed>
       <div class="sec-head">
         <h2 id="h-camera">Camera</h2>
@@ -179,8 +195,6 @@
             <button type="button" class="cpick" data-for="cHot" aria-haspopup="dialog" aria-expanded="false" aria-controls="cpop" aria-labelledby="l-cHot n-cHot"><span class="sw"><i></i></span><span class="cname" id="n-cHot"></span><svg class="ic"><use href="#i-chev"/></svg></button></div>
         </div>
         <div class="field"><div class="lab"><label for="bright">Exposure</label><output for="bright"></output></div><input type="range" id="bright" min="0.2" max="8" step="0.01" value="8"></div>
-        <div class="field"><div class="lab"><label for="glow">Glow dots</label><output for="glow"></output></div><input type="range" id="glow" min="0" max="1" step="0.01" value="0.23"></div>
-        <div class="field"><div class="lab"><label for="gsize">Glow size</label><output for="gsize"></output></div><input type="range" id="gsize" min="0.5" max="4" step="0.01" value="3.63"></div>
         <div class="field"><div class="lab"><label for="halo">Haze</label><output for="halo"></output></div><input type="range" id="halo" min="0" max="2" step="0.01" value="0"></div>
         <div class="field"><div class="lab"><label for="grain">Grain</label><output for="grain"></output></div><input type="range" id="grain" min="0" max="0.3" step="0.005" value="0.03"></div>
       </div></div>
@@ -195,7 +209,7 @@
       <div class="sec-body" id="b-export"><div class="sec-in">
         <div class="two">
           <div class="field"><label class="flabel" for="exportFmt">Format</label>
-            <select id="exportFmt"><option value="png">PNG</option><option value="gif">GIF</option><option value="mp4">MP4</option></select></div>
+            <select id="exportFmt"><option value="png">PNG</option><option value="gif">GIF</option><option value="mp4">MP4</option><option value="code">Code</option></select></div>
           <div class="field"><label class="flabel" for="exportSize">Resolution</label>
             <select id="exportSize"><option value="small">Small</option><option value="screen">Screen</option><option value="2x" selected>2x</option><option value="4k">4K</option></select></div>
         </div>
@@ -207,13 +221,14 @@
       </div></div>
     </section>
 
-    <p class="foot">Drag to move · Scroll to zoom · H hides the UI</p>
+    <p class="foot">Hover to disturb · Drag to move · Scroll to zoom · H hides the UI</p>
   </div>
 </form>
 
 <!-- Color palette popover; lives outside the panel so the panel's scrolling and blur don't clip it -->
 <div class="cpop" id="cpop" role="dialog" aria-label="Choose a color" hidden><div class="swatches" role="radiogroup"></div></div>
 
-<script src="main.js?v=5"></script>
+<script src="portal-core.js?v=6"></script>
+<script src="main.js?v=6"></script>
 </body>
 </html>

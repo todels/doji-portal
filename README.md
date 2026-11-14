@@ -18,10 +18,19 @@ npx serve .
 
 - `index.html` – the page and control panel
 - `style.css` – panel styling
-- `main.js` – the WebGL shader (in the `FRAG` string), controls, presets, camera and export
+- `portal-core.js` – the WebGL shader (in the `FRAG` string), GL setup, the mouse disturbance and the embed runtime. The editor and the exported code both run this file, so they always match.
+- `main.js` – controls, presets, camera and export
+
+## Mouse
+
+Moving the cursor over the portal drags the flow along with it, and the flow settles back when the cursor stops. The Mouse section sets how hard it pushes (Strength), how wide the push is (Size) and how long it takes to settle (Settle). Exports are rendered without it.
+
+## Export code
+
+Export with the format set to Code to get one self-contained `.html` file for a developer: the current look, the shader and the mouse disturbance, without the editor. Open it to see it running, or paste its `<div class="doji-portal">` and `<script>` into a landing page. The portal fills that div, so size the div with CSS. `DojiPortal.mount(element, overrides)` mounts one from code and returns `{ destroy() }`.
 
 ## Export
 
-PNG, GIF and MP4 export are built in, and PNG can have a transparent background. Every exported file carries the settings it was made with, and "Import settings" restores them (it also takes a .json of what "Copy settings" copies).
+PNG, GIF, MP4 and Code export are built in, and PNG and Code can have a transparent background. Every exported file carries the settings it was made with, and "Import settings" restores them (it also takes a .json of what "Copy settings" copies, and an exported code file).
 
 GIF export loads `gifenc` and MP4 export loads `mp4-muxer` from jsDelivr on demand, so those need an internet connection.

@@ -1,200 +1,15 @@
 (() => {
-const VERT = `#version 300 es
-in vec2 a; void main(){ gl_Position = vec4(a,0.0,1.0); }`;
-
-const FRAG = `#version 300 es
-precision highp float;
-out vec4 o;
-uniform vec2 uRes; uniform float uT;
-uniform float uGlowAmt,uGlowSize,uStretch,uWarp,uWFall,uInner,uCoreBend;
-uniform float uZoom,uRotDeg,uCX,uCY,uFine;
-uniform float uBreathAmt,uBreathPh;
-float gFill=0.0;
-float gDot=1.0;
-float gFan=1.0;
-float gL=0.0;
-uniform float uLW,uSpread,uDens,uFront,uHalo,uFill,uPhase,uOff,uReach;
-uniform float uLayers,uDepth,uLOff,uHotAmt,uHotPos,uTails;
-uniform float uMass,uHor,uTwist,uTurb,uBright,uGrain;
-uniform vec3 uBlue,uHot;
-uniform float uAlpha;
-
-float h21(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
-float h31(vec3 p){p=fract(p*0.3183099+0.1);p*=17.0;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
-float n3(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.0-2.0*f);
-  return mix(mix(mix(h31(i),h31(i+vec3(1,0,0)),f.x),mix(h31(i+vec3(0,1,0)),h31(i+vec3(1,1,0)),f.x),f.y),
-             mix(mix(h31(i+vec3(0,0,1)),h31(i+vec3(1,0,1)),f.x),mix(h31(i+vec3(0,1,1)),h31(i+vec3(1,1,1)),f.x),f.y),f.z);}
-
-// Lens: screen point -> point in a stream layer behind the hole. E = that layer's ring radius.
-vec2 lens(vec2 th, float E){
-  float r2=dot(th,th)+1e-7;
-  float r=sqrt(r2);
-  float alpha=uWarp*E*pow(E/r,uWFall);
-  vec2 b=th-th/r*alpha;
-  float tw=uTwist*E*E/(r2+E*E*0.15);
-  float c=cos(tw), s=sin(tw);
-  b=mat2(c,-s,s,c)*b;
-  float ring=exp(-pow((r-E)/(E*0.9+1e-4),2.0));
-  vec2 nn=vec2(n3(vec3(th*3.5/(E+0.05),uT*0.15)),n3(vec3(th*3.5/(E+0.05)+17.0,uT*0.15)))-0.5;
-  b+=nn*uTurb*E*0.6*ring;
-  return b;
-}
-
-// Soft dot profile, pixel-aware: keeps total light constant when a dot shrinks below a pixel.
-float prof(float d, float w, float fw){
-  float s=sqrt(w*w+fw*fw*0.5);
-  return exp(-d*d/(s*s))*(w/s);
-}
-
-// 1 where the stream passes the hole, 0 far above and below it.
-float fanAt(float y){ return exp(-pow(y/(uMass*uReach+1e-4),2.0)); }
-float spreadAt(float y){ return uSpread+gFan*gFill*uMass*0.7*fanAt(y); }
-
-// A dense crowd of tiny dots packed around a line at x = off.
-// Lanes live in spread-relative units, so Spread squeezes the same dots closer instead of removing them.
-vec3 dots(vec2 s, float off, float laneN, float rowH, float spd, float seed, float fw, vec3 col){
-  float sp=spreadAt(s.y);
-  float ux=(s.x-off)/sp;
-  float base=floor(ux/laneN);
-  float acc=0.0;
-  for(int k=-1;k<=1;k++){
-    float lane=base+float(k);
-    float ph=h21(vec2(lane,seed+5.3))*rowH;
-    float spdL=spd*(0.85+0.3*h21(vec2(lane,seed+9.1)));
-    float y=s.y+uPhase*spdL+ph;
-    float row0=floor(y/rowH);
-    float lc=(lane+0.5)*laneN;
-    if(abs(lc)>3.0) continue;
-    float L=gL*rowH*2.6;
-    // each dot drags a trail behind it (upward, since it falls); the lens stretches these into long arcs
-    for(int j=0;j<3;j++){
-      if(j>0 && L<1e-5) break;
-      float row=row0-float(j);
-      vec2 id=vec2(lane,mod(row,4096.0))+seed;
-      if(h21(id)>uDens*exp(-lc*lc)) continue;
-      vec2 c=vec2(off+(lc+(h21(id+1.7)-0.5)*laneN*0.8)*sp, (row+0.1+0.8*h21(id+4.2))*rowH);
-      float w=0.00055*uLW*gDot*(0.6+0.8*h21(id+8.1));
-      float ty=clamp(y-c.y,0.0,L);
-      float fade=1.0-0.75*ty/max(L,1e-5);
-      acc+=prof(length(vec2(s.x-c.x,y-c.y-ty)),w,fw)*(0.6+0.7*h21(id+6.6))*fade;
-    }
-  }
-  return col*acc;
-}
-
-// Rare glowing dots, a bit bigger than the rest, scattered at random along the stream.
-vec3 glows(vec2 s, float off, float seed, float fw){
-  float G=0.08;
-  float y=s.y+uPhase*0.9;
-  float r0=floor(y/G);
-  float sp=spreadAt(s.y);
-  vec3 acc=vec3(0.0);
-  for(int k=-1;k<=1;k++){
-    float row=r0+float(k);
-    vec2 id=vec2(mod(row,4096.0),seed);
-    if(h21(id)>uGlowAmt*0.6) continue;
-    float cx=off+(h21(id+1.3)-0.5)*3.0*sp;
-    float cy=(row+h21(id+2.7))*G;
-    float d=length(vec2(s.x-cx,y-cy));
-    float w=0.0007*uLW*gDot*uGlowSize*(0.7+0.6*h21(id+3.3));
-    float tw=0.65+0.35*sin(uT*2.5+h21(id+5.0)*40.0);
-    vec3 gc=mix(uHot,vec3(1.0,0.96,0.9),0.35*h21(id+7.7));
-    acc+=gc*(prof(d,w,fw)*2.2+prof(d,w*4.5,fw)*0.4)*tw;
-  }
-  return acc;
-}
-
-vec3 stream(vec2 s, float off, float seed, float fw, vec3 col){
-  vec3 c=dots(s,off,0.3,0.0035,1.0,seed,fw,col)*1.3;
-  c+=dots(s,off,0.45,0.0055,0.7,seed+67.0,fw,col)*0.9;
-  c+=glows(s,off,seed+11.0,fw);
-  return c;
-}
-
-void main(){
-  vec2 ps=(gl_FragCoord.xy-0.5*uRes)/uRes.y;
-  float cr=cos(radians(uRotDeg)), sr=sin(radians(uRotDeg));
-  vec2 p=mat2(cr,sr,-sr,cr)*(ps/uZoom)+vec2(uCX,uCY);
-  gDot=mix(1.0,1.0/uZoom,uFine);
-  // Breathe: depth and fan out swell and settle together.
-  float br=sin(uBreathPh);
-  gFill=uFill*max(0.0,1.0+uBreathAmt*br);
-  float depthE=clamp(uDepth*(1.0+uBreathAmt*br),0.0,1.0);
-  float r=length(p);
-  float E=uMass;
-  vec3 col=vec3(0.0);
-  float n=max(uLayers,1.0);
-
-  // Stream layers at different depths behind the hole: each one bends into its own ring, so they nest and fill the disc.
-  for(int i=0;i<8;i++){
-    if(float(i)>=n) break;
-    float t=n>1.0?float(i)/(n-1.0):0.5;
-    float Ei=E*mix(1.0-depthE*0.55,1.0+depthE*0.25,t);
-    vec2 s=lens(p,Ei);
-    float fw=max(length(dFdx(s)),length(dFdy(s)));
-    // Stretch only where the lens magnifies: dots keep their shape in the stream, the warp pulls them into arcs.
-    float sfac=smoothstep(1.6,4.5,r/max(length(s),1e-5));
-    gL=uStretch*sfac;
-    float off=uOff+(h21(vec2(float(i),3.7))-0.5)*2.0*uLOff*fanAt(s.y);
-    float hot=uHotAmt*exp(-pow((t-uHotPos)/0.16,2.0));
-    vec3 tint=mix(uBlue,uHot,hot);
-    vec3 c=stream(s,off,float(i)*41.0,fw,tint)*(1.0+hot*1.5);
-    float dx=s.x-off;
-    float sp=spreadAt(s.y);
-    c+=tint*exp(-dx*dx/(sp*sp*30.0))*uHalo*0.05;
-    float near=exp(-pow(r/(Ei*1.5),4.0));
-    float inner=mix(uInner,1.0,smoothstep(Ei*0.8,Ei*1.02,r));
-    col+=c*(1.6/sqrt(n))*mix(uTails,1.0,near)*inner;
-  }
-
-  float hole=E*uHor;
-  col*=smoothstep(hole*0.97,hole*1.03+0.0005,r);
-
-  // The line in front of the hole: never bent.
-  // The middle line runs through its own small warp, so it bends and stretches like the rest instead of sitting on top.
-  if(uFront>0.0){
-    vec2 sc=lens(p,E*uCoreBend);
-    float fw=max(length(dFdx(sc)),length(dFdy(sc)));
-    float sfac=smoothstep(1.6,4.5,r/max(length(sc),1e-5));
-    gFan=0.0; gL=uStretch*sfac;
-    col+=stream(sc,uOff,977.0,fw,uBlue)*uFront;
-  }
-
-  col=1.0-exp(-col*uBright);
-  col*=1.0+(h21(gl_FragCoord.xy+fract(uT*13.7)*100.0)-0.5)*uGrain*3.0;
-  col=clamp(col,0.0,1.0);
-  // Transparent export: the light becomes its own alpha (premultiplied), so it lands exactly like this over black.
-  o=vec4(col,uAlpha>0.5?max(col.r,max(col.g,col.b)):1.0);
-}`;
-
+const core = dojiPortalCore();
 const canvas = document.getElementById('gl');
 const gl = canvas.getContext('webgl2', { antialias: false });
 if (!gl) { document.querySelector('.stage').textContent = 'This browser does not support WebGL 2, which this piece needs.'; return; }
+const { u } = core.setup(gl);
+const disturb = core.makeDisturb(gl);
 
-function sh(type, src){ const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
-  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s)); return s; }
-const prog = gl.createProgram();
-gl.attachShader(prog, sh(gl.VERTEX_SHADER, VERT));
-gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FRAG));
-gl.linkProgram(prog);
-if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) console.error(gl.getProgramInfoLog(prog));
-gl.useProgram(prog);
-
-const buf = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
-const loc = gl.getAttribLocation(prog, 'a');
-gl.enableVertexAttribArray(loc);
-gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-
-const U = {};
-const u = n => (U[n] ??= gl.getUniformLocation(prog, n));
 const $ = id => document.getElementById(id);
-const sliders = { breathe:'uBreathAmt', zoom:'uZoom', rot:'uRotDeg', cx:'uCX', cy:'uCY', fine:'uFine', corebend:'uCoreBend', stretch:'uStretch', warp:'uWarp', wfall:'uWFall', inner:'uInner', glow:'uGlowAmt', gsize:'uGlowSize', lw:'uLW', spread:'uSpread', dens:'uDens', front:'uFront', halo:'uHalo', fill:'uFill', off:'uOff', reach:'uReach',
-  layers:'uLayers', depth:'uDepth', loff:'uLOff', tails:'uTails', hotamt:'uHotAmt', hotpos:'uHotPos',
-  mass:'uMass', hor:'uHor', twist:'uTwist', turb:'uTurb', bright:'uBright', grain:'uGrain' };
-const colors = { cBlue:'uBlue', cHot:'uHot' };
-const hex = h => [1,3,5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
+const sliders = core.UNIFORMS;
+const colors = core.COLORS;
+const hex = core.hex;
 // The only colors on offer: eight blues, then eight golds, dark to light.
 const PALETTE = [
   ['Midnight', '#1a2a9c'], ['Doji', '#2c3ad6'], ['Royal', '#3550ff'], ['Cobalt', '#2f6bff'],
@@ -203,7 +18,7 @@ const PALETTE = [
   ['Glow', '#ffc49a'], ['Sand', '#ffd9a0'], ['Champagne', '#ffe7c2'], ['Ivory', '#fff3dd']
 ];
 
-const units = { rot: '°', zoom: '×' };
+const units = { rot: '°', zoom: '×', msettle: 's' };
 // Show as many decimals as the slider's step uses (at least 2 for fine steps), so tiny values like Spread don't read as 0.000.
 function places(el){ const s = el.step, d = (s.split('.')[1] || '').length; return +s >= 0.1 ? d : Math.max(2, d); }
 function outputs(){
@@ -239,6 +54,13 @@ canvas.addEventListener('pointermove', e => {
   setCenter(+$('cx').value - wx, +$('cy').value - wy);
 });
 const endDrag = () => { drag = null; canvas.style.cursor = 'grab'; };
+// Hover: the cursor pushes the flow around (paused while dragging the camera, so the two don't fight).
+canvas.addEventListener('pointermove', e => {
+  if (drag) { disturb.lift(); return; }
+  const r = canvas.getBoundingClientRect();
+  disturb.move((e.clientX - r.left - r.width / 2) / r.height, -(e.clientY - r.top - r.height / 2) / r.height);
+});
+canvas.addEventListener('pointerleave', () => disturb.lift());
 canvas.addEventListener('pointerup', endDrag);
 canvas.addEventListener('pointercancel', endDrag);
 canvas.addEventListener('wheel', e => {
@@ -265,15 +87,20 @@ function resize(){
 window.addEventListener('resize', resize);
 
 const presets = {
-  contour: { lw:0.38, spread:0.0002, dens:0.06, stretch:0.49, glow:0, gsize:3.63, front:0.78, corebend:0.37, halo:0.71, fill:0, reach:0.8, speed:0.05, off:-0.002, layers:8, depth:0.09, loff:0.042, tails:1, breathe:0.3, bspeed:0.12, hotamt:0, hotpos:0.33, mass:0.17, hor:0.58, warp:1.7, wfall:0.52, inner:0.19, twist:0, turb:0, zoom:1, rot:0, cx:0, cy:0 },
-  doji:   { lw:0.2, spread:0.0002, dens:1, stretch:0.49, glow:0.23, gsize:3.63, front:0.78, halo:0, fill:0.34, reach:0.8, speed:0.08, off:0, layers:8, depth:0.09, loff:0.042, tails:1, hotamt:0, hotpos:0.33, mass:0.17, hor:0.58, warp:1.7, wfall:0.52, inner:0.19, twist:0, turb:0, bright:8 },
-  clean:  { lw:1, spread:0.001, dens:1, stretch:0.49, glow:0.23, gsize:3.63, front:1, halo:0.52, fill:0.25, reach:0.5, speed:0.1, off:0.004, layers:7, depth:0.6, loff:0.018, tails:0.12, hotamt:0.55, hotpos:0.35, mass:0.19, hor:0.14, warp:1.7, wfall:0.52, inner:0.19, twist:0, turb:0, bright:3.5, grain:0.03 },
-  vortex: { lw:0.99, spread:0.006, dens:1, stretch:0.51, glow:0.23, gsize:3.63, front:0, halo:1.08, fill:0.66, reach:0.5, speed:0.05, off:-0.014, layers:5, depth:1, loff:0.035, tails:0, hotamt:0.9, hotpos:0.3, mass:0.2, hor:0.1, warp:1.57, wfall:0.52, inner:0, twist:0.39, turb:0.44, bright:6.17, grain:0.03 },
-  wide:   { lw:0.9, spread:0.0008, dens:1, front:1.2, halo:0.3, fill:0.1, reach:1.2, speed:0.06, off:0, layers:4, depth:0.4, loff:0.01, tails:0.3, hotamt:0.4, hotpos:0.5, mass:0.22, hor:0.3, twist:0, turb:0, bright:3 }
+  contour: { smode:0, lw:0.38, spread:0.0002, dens:0.06, stretch:0.49, front:0.78, corebend:0.37, halo:0.71, fill:0, reach:0.8, speed:0.05, off:-0.002, layers:8, depth:0.09, loff:0.042, tails:1, breathe:0.3, bspeed:0.12, hotamt:0, hotpos:0.33, mass:0.17, hor:0.58, warp:1.7, wfall:0.52, inner:0.19, twist:0, turb:0, zoom:1, rot:0, cx:0, cy:0 },
+  doji:   { smode:0, lw:0.2, spread:0.0002, dens:1, stretch:0.49, front:0.78, halo:0, fill:0.34, reach:0.8, speed:0.08, off:0, layers:8, depth:0.09, loff:0.042, tails:1, hotamt:0, hotpos:0.33, mass:0.17, hor:0.58, warp:1.7, wfall:0.52, inner:0.19, twist:0, turb:0, bright:8 },
+  clean:  { smode:0, lw:1, spread:0.001, dens:1, stretch:0.49, front:1, halo:0.52, fill:0.25, reach:0.5, speed:0.1, off:0.004, layers:7, depth:0.6, loff:0.018, tails:0.12, hotamt:0.55, hotpos:0.35, mass:0.19, hor:0.14, warp:1.7, wfall:0.52, inner:0.19, twist:0, turb:0, bright:3.5, grain:0.03 },
+  vortex: { smode:0, lw:0.99, spread:0.006, dens:1, stretch:0.51, front:0, halo:1.08, fill:0.66, reach:0.5, speed:0.05, off:-0.014, layers:5, depth:1, loff:0.035, tails:0, hotamt:0.9, hotpos:0.3, mass:0.2, hor:0.1, warp:1.57, wfall:0.52, inner:0, twist:0.39, turb:0.44, bright:6.17, grain:0.03 },
+  side:   { smode:0, lw:0.41, spread:0.0004, dens:1, stretch:0, front:1.43, corebend:0.63, halo:0, fill:0.1, reach:0.5, speed:0.02, off:0, layers:8, depth:0.4, loff:0.01, tails:1, breathe:0, bspeed:0.01, hotamt:0, hotpos:0.98, mass:0.16, hor:0.3, warp:1.57, wfall:0.46, inner:0, twist:0, turb:0, zoom:1, rot:0, cx:0.1364, cy:0.0002, fine:1, bright:8, grain:0.03, cBlue:'#2c3ad6', cHot:'#ffc49a' },
+  star:   { smode:1, lw:0.2, spread:0.0002, dens:1, stretch:1, front:0.9, corebend:0.53, halo:0, fill:0.15, reach:0.5, speed:0.04, off:0, layers:8, depth:0.68, loff:0.017, tails:0, breathe:0, bspeed:0.01, hotamt:0, hotpos:0.38, mass:0.17, hor:0, warp:2.46, wfall:0.4, inner:0.8, twist:0, turb:0, zoom:1, rot:0, cx:0, cy:0, fine:1, bright:8, grain:0.3, cBlue:'#2c3ad6', cHot:'#ffc49a' }
 };
 // The last preset clicked stays lit until a slider or color is changed by hand.
 const markPreset = name => document.querySelectorAll('[data-preset]').forEach(b => b.classList.toggle('on', b.dataset.preset === name));
+// A preset is a whole look: every look control it doesn't set goes back to its default first,
+// so nothing (a camera shift, say) leaks over from the previous preset. Picked colors stay unless the preset sets them.
+const LOOK = ['dots', 'stream', 'layers', 'warp', 'camera', 'look'].map(s => `.sec[data-sec="${s}"] input[type=range],.sec[data-sec="${s}"] select`).join(',');
 document.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll(LOOK).forEach(el => { el.value = defaultsAll[el.id]; });
   Object.entries(presets[b.dataset.preset]).forEach(([k, val]) => { $(k).value = val; });
   outputs();
   markPreset(b.dataset.preset);
@@ -393,7 +220,7 @@ $('copy').addEventListener('click', ()=>{
 
 outputs(); resize();
 
-let t = 0, phase = 0, bph = 0, last = performance.now();
+let t = 0, phase = 0, bph = 0, last = performance.now(), dispLive = false, exporting = false;
 function frame(now){
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
   if (busy) { requestAnimationFrame(frame); return; }
@@ -402,6 +229,7 @@ function frame(now){
   // keep the clocks small so the GPU's float precision never degrades the dot pattern
   if (phase > 400) phase -= 400;
   if (t > 1800) t -= 1800;
+  dispLive = disturb.step(dt, canvas.width / canvas.height, +$('mstr').value, +$('msize').value, +$('msettle').value);
   draw();
   requestAnimationFrame(frame);
 }
@@ -410,6 +238,8 @@ function draw(){
   gl.uniform1f(u('uBreathPh'), bph);
   gl.uniform2f(u('uRes'), canvas.width, canvas.height);
   gl.uniform1f(u('uT'), t);
+  // Exports are always rendered clean, without the mouse disturbance.
+  gl.uniform1f(u('uDispOn'), dispLive && !exporting ? 1 : 0);
   for (const [id, n] of Object.entries(sliders)) gl.uniform1f(u(n), +$(id).value);
   for (const [id, n] of Object.entries(colors)) gl.uniform3fv(u(n), hex($(id).value));
   gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -477,7 +307,8 @@ $('loadFile').addEventListener('change', async () => {
     // A .json file holding what "Copy settings" puts on the clipboard
     else if (/\.json$/i.test(f.name)) { const j = JSON.parse(new TextDecoder().decode(bytes)); settings = j.settings || j; }
     if (!settings) { say('No Doji settings found in that file. Only files exported from here carry them.'); return; }
-    apply(settings); save(); markPreset(null);
+    // Files saved before Stretch type existed were drawn with the trail look.
+    apply(Object.assign({ smode: '1' }, settings)); save(); markPreset(null);
     say('Loaded the settings from ' + f.name + '.');
   } catch (e) { say('Could not read settings from that file.'); }
 });
@@ -610,21 +441,78 @@ async function exportVideoRealtime(){
   await saveFile('doji-portal-' + w + 'x' + h + '.' + ext, new Blob(chunks, { type: mime.split(';')[0] }));
 }
 
-let exporting = false;
+// ---- Export code: one self-contained HTML file a developer can open as is, or lift into a landing page ----
+// It carries the current look, the shader and the mouse disturbance, and nothing of the editor.
+async function exportCode(){
+  const skip = new Set(['ratio', 'exportFmt', 'exportSize', 'exportLen']);
+  const lines = [];
+  panel.querySelectorAll('input[type=range],input[type=color],select').forEach(el => {
+    if (!el.id || skip.has(el.id)) return;
+    const lab = document.querySelector('label[for="' + el.id + '"]') || $('l-' + el.id);
+    const v = el.type === 'color' ? el.value : +el.value;
+    lines.push('  ' + el.id + ': ' + JSON.stringify(v) + ',' + (lab ? ' // ' + lab.textContent.trim() : ''));
+  });
+  lines.push('  transparent: ' + $('transparent').checked + ', // true: see-through background, to layer over your own');
+  lines.push('  maxPixelRatio: 2 // lower to 1.5 or 1 for faster rendering on large screens');
+  const day = new Date().toISOString().slice(0, 10);
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Doji Portal</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; }
+  /* The portal fills this element, so size it however the page needs. Here it covers the window. */
+  .doji-portal { position: relative; width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+
+<!-- 1. Put this element where the portal should appear. Anything inside it sits on top of the animation. -->
+<div class="doji-portal"></div>
+
+<!-- 2. Add this script once, after the element (the end of <body> is best). No libraries, it needs WebGL 2.
+     Every .doji-portal on the page gets a portal. From your own code (React etc.):
+     const portal = DojiPortal.mount(element, { speed: 0.1 }); ...later: portal.destroy(); -->
+<script>
+(() => {
+// Exported from Doji Portal on ${day}. Change these to tune the look, or export again from the editor.
+const SETTINGS = {
+${lines.join('\n')}
+};
+
+${dojiPortalCore.toString()}
+
+${dojiPortalMount.toString()}
+
+const core = dojiPortalCore();
+window.DojiPortal = { mount: (el, overrides) => dojiPortalMount(el, Object.assign({}, SETTINGS, overrides), core) };
+document.querySelectorAll('.doji-portal').forEach(el => window.DojiPortal.mount(el));
+})();
+</script>
+<!-- ${settingsText()} -->
+</body>
+</html>
+`;
+  await saveFile('doji-portal-embed.html', new Blob([html], { type: 'text/html' }));
+}
+
 $('export').addEventListener('click', async () => {
   if (!downloads || exporting) return;
   exporting = true; $('export').disabled = true;
   try {
     const f = $('exportFmt').value;
-    if (f === 'png') await exportPNG(); else if (f === 'gif') await exportGIF(); else await exportVideo();
+    if (f === 'png') await exportPNG(); else if (f === 'gif') await exportGIF(); else if (f === 'code') await exportCode(); else await exportVideo();
   } catch (e) { msg('Export failed.'); console.error(e); }
   exporting = false; $('export').disabled = false;
 });
 function syncExportUI(){
   const f = $('exportFmt').value;
-  $('exportLen').closest('.field').hidden = f === 'png';
-  $('transparent').closest('.switch').hidden = f !== 'png';
-  $('export').querySelector('span').textContent = 'Export ' + f.toUpperCase();
+  $('exportLen').closest('.field').hidden = f === 'png' || f === 'code';
+  $('exportSize').closest('.field').hidden = f === 'code';
+  $('transparent').closest('.switch').hidden = f !== 'png' && f !== 'code';
+  $('export').querySelector('span').textContent = f === 'code' ? 'Export code' : 'Export ' + f.toUpperCase();
 }
 $('exportFmt').addEventListener('change', syncExportUI); syncExportUI();
 })();
