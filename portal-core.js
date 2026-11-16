@@ -1,4 +1,4 @@
-// The shared heart of Doji Portal: the shader, the uniform map, GL setup and the mouse disturbance.
+// The shared heart of Doji Portal: the shader, the uniform map, GL setup and the cursor lens.
 // The editor (main.js) and the exported embed code both run exactly this, so they can never drift apart.
 // Keep both functions self-contained: "Export code" copies their source text into the embed file.
 
@@ -18,7 +18,7 @@ uniform float uLayers,uDepth,uLOff,uHotAmt,uHotPos,uTails;
 uniform float uMass,uHor,uTwist,uTurb,uBright,uGrain;
 uniform vec3 uBlue,uHot;
 uniform float uAlpha;
-uniform sampler2D uDisp; uniform float uDispOn;
+uniform vec2 uMP; uniform float uMM;
 float gFill=0.0;
 float gDot=1.0;
 float gFan=1.0;
@@ -44,6 +44,17 @@ vec2 lens(vec2 th, float E){
   vec2 nn=vec2(n3(vec3(th*3.5/(E+0.05),uT*0.15)),n3(vec3(th*3.5/(E+0.05)+17.0,uT*0.15)))-0.5;
   b+=nn*uTurb*E*0.6*ring;
   return b;
+}
+
+// The cursor is a second, smaller mass. It bends the streams with the same law as the hole, scaled with each
+// layer's depth the way the hole's rings are, so every layer arcs around it by its own amount.
+// It fades out a few radii away, so it stays a local warp instead of swaying the whole picture.
+vec2 cursorBend(vec2 th, float E){
+  if(uMM<=0.0) return vec2(0.0);
+  vec2 dm=th-uMP;
+  float rm=sqrt(dot(dm,dm)+1e-8);
+  float Em=uMM*E/max(uMass,1e-4);
+  return dm/rm*uWarp*Em*pow(Em/rm,uWFall)*exp(-pow(rm/(Em*6.0),2.0));
 }
 
 // Soft dot profile, pixel-aware: keeps total light constant when a dot shrinks below a pixel.
@@ -132,8 +143,6 @@ vec3 stream(vec2 s, float off, float seed, float fw, vec3 col){
 
 void main(){
   vec2 ps=(gl_FragCoord.xy-0.5*uRes)/uRes.y;
-  // Mouse: the cursor drags the flow along with it, and the flow settles back when it stops.
-  if(uDispOn>0.5) ps-=texture(uDisp,gl_FragCoord.xy/uRes).rg;
   float cr=cos(radians(uRotDeg)), sr=sin(radians(uRotDeg));
   vec2 p=mat2(cr,sr,-sr,cr)*(ps/uZoom)+vec2(uCX,uCY);
   gDot=mix(1.0,1.0/uZoom,uFine);
@@ -151,10 +160,11 @@ void main(){
     if(float(i)>=n) break;
     float t=n>1.0?float(i)/(n-1.0):0.5;
     float Ei=E*mix(1.0-depthE*0.55,1.0+depthE*0.25,t);
-    vec2 s=lens(p,Ei);
+    vec2 s0=lens(p,Ei);
+    vec2 s=s0-cursorBend(p,Ei);
     float fw=max(length(dFdx(s)),length(dFdy(s)));
-    // Stretch only where the lens magnifies: dots keep their shape in the stream, the warp pulls them into arcs.
-    float sfac=smoothstep(1.6,4.5,r/max(length(s),1e-5));
+    // Stretch only where the hole magnifies: dots keep their shape in the stream, the warp pulls them into arcs.
+    float sfac=smoothstep(1.6,4.5,r/max(length(s0),1e-5));
     gL=uStretch*sfac;
     gTrail=uTrailMode;
     float off=uOff+(h21(vec2(float(i),3.7))-0.5)*2.0*uLOff*fanAt(s.y);
@@ -174,9 +184,10 @@ void main(){
 
   // The middle line runs through its own small warp, so it bends and stretches like the rest instead of sitting on top.
   if(uFront>0.0){
-    vec2 sc=lens(p,E*uCoreBend);
+    vec2 sc0=lens(p,E*uCoreBend);
+    vec2 sc=sc0-cursorBend(p,E*uCoreBend);
     float fw=max(length(dFdx(sc)),length(dFdy(sc)));
-    float sfac=smoothstep(1.6,4.5,r/max(length(sc),1e-5));
+    float sfac=smoothstep(1.6,4.5,r/max(length(sc0),1e-5));
     gFan=0.0; gL=uStretch*sfac; gTrail=1.0;
     col+=stream(sc,uOff,977.0,fw,uBlue)*uFront;
   }
@@ -212,92 +223,36 @@ function setup(gl){
   gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
   const U = {};
   const u = n => (U[n] ??= gl.getUniformLocation(prog, n));
-  gl.uniform1i(u('uDisp'), 0);
   return { prog, u };
 }
 
-// Mouse disturbance: a coarse grid of offsets laid over the canvas, sent to the shader as a texture.
-// Moving the cursor pushes the cells under it along with the motion; every cell then eases back to zero,
-// so the flow bends with the mouse and heals behind it.
-function makeDisturb(gl){
-  const N = 96, D = new Float32Array(N * N * 2), B = new Float32Array(N * N * 2);
-  const tex = gl.createTexture();
-  gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, tex);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG16F, N, N, 0, gl.RG, gl.FLOAT, D);
-  const pts = [];
-  let last = null, live = false;
-  // Add one soft push of (vx, vy) centred on (cx, cy). Units: canvas height = 1, origin at the centre, y up.
-  function splat(cx, cy, vx, vy, R, aspect){
-    const i0 = Math.max(0, Math.floor(((cx - 3 * R) / aspect + 0.5) * N)), i1 = Math.min(N - 1, Math.ceil(((cx + 3 * R) / aspect + 0.5) * N));
-    const j0 = Math.max(0, Math.floor((cy - 3 * R + 0.5) * N)), j1 = Math.min(N - 1, Math.ceil((cy + 3 * R + 0.5) * N));
-    for (let j = j0; j <= j1; j++) {
-      const y = (j + 0.5) / N - 0.5;
-      for (let i = i0; i <= i1; i++) {
-        const x = ((i + 0.5) / N - 0.5) * aspect, w = Math.exp(-((x - cx) ** 2 + (y - cy) ** 2) / (R * R));
-        if (w < 1e-3) continue;
-        const k = (j * N + i) * 2;
-        let dx = D[k] + vx * w, dy = D[k + 1] + vy * w;
-        // Never push a cell further than the brush is wide, so the flow bends instead of folding over itself.
-        const m = Math.hypot(dx, dy); if (m > R) { dx *= R / m; dy *= R / m; }
-        D[k] = dx; D[k + 1] = dy;
-      }
-    }
-  }
+// The cursor's lens. It eases toward the pointer, so it moves like something with weight, and fades in and out
+// as the pointer enters and leaves. Positions are canvas units: height = 1, origin at the centre, y up.
+function makeCursor(){
+  let tx = 0, ty = 0, x = 0, y = 0, on = false, amp = 0;
   return {
-    // Pointer position in canvas units (height = 1, origin at the centre, y up).
-    move(x, y){ pts.push([x, y]); },
-    // Pointer left or a drag started: the next move begins a fresh stroke instead of jumping.
-    lift(){ pts.length = 0; last = null; },
-    // Advance dt seconds. strength 0..1, size = brush radius in canvas heights, settle = seconds to ease back.
-    // Returns true while there is anything left to draw.
-    step(dt, aspect, strength, size, settle){
-      let pushed = false;
-      for (const p of pts) {
-        if (last && strength > 0) {
-          const dx = p[0] - last[0], dy = p[1] - last[1], len = Math.hypot(dx, dy);
-          if (len > 0 && len < 0.5) {
-            const k = Math.max(1, Math.ceil(len / (size * 0.3))), g = strength * 1.5 / k;
-            for (let s = 1; s <= k; s++) splat(last[0] + dx * s / k, last[1] + dy * s / k, dx * g, dy * g, size, aspect);
-            pushed = true;
-          }
-        }
-        last = p;
-      }
-      pts.length = 0;
-      if (!live && !pushed) return false;
-      // Ease back toward rest, with a light blur so the wake softens and spreads like a fluid.
-      const f = Math.exp(-dt / Math.max(0.05, settle)), b = 1 - Math.exp(-dt * 6);
-      let peak = 0;
-      for (let j = 0; j < N; j++) {
-        const jm = j > 0 ? j - 1 : j, jp = j < N - 1 ? j + 1 : j;
-        for (let i = 0; i < N; i++) {
-          const im = i > 0 ? i - 1 : i, ip = i < N - 1 ? i + 1 : i;
-          const k = (j * N + i) * 2, kl = (j * N + im) * 2, kr = (j * N + ip) * 2, kd = (jm * N + i) * 2, ku = (jp * N + i) * 2;
-          for (let c = 0; c < 2; c++) {
-            const v0 = D[k + c], blur = (D[kl + c] + D[kr + c] + D[kd + c] + D[ku + c]) * 0.25;
-            const v = (v0 + (blur - v0) * b) * f;
-            B[k + c] = v;
-            if (v > peak) peak = v; else if (-v > peak) peak = -v;
-          }
-        }
-      }
-      D.set(B);
-      live = peak > 2e-5;
-      if (!live) D.fill(0);
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, tex);
-      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, N, N, gl.RG, gl.FLOAT, D);
-      return live;
+    move(px, py){ tx = px; ty = py; if (amp < 0.01) { x = px; y = py; } on = true; },
+    leave(){ on = false; },
+    // lag = seconds it takes to catch up with the pointer.
+    step(dt, lag){
+      const k = 1 - Math.exp(-dt / Math.max(0.01, lag));
+      x += (tx - x) * k; y += (ty - y) * k;
+      amp += ((on ? 1 : 0) - amp) * (1 - Math.exp(-dt / 0.25));
+      if (!on && amp < 0.002) amp = 0;
+      return { x, y, amp };
     }
   };
 }
 
-return { VERT, FRAG, UNIFORMS, COLORS, hex, setup, makeDisturb };
+// Send the cursor lens to the shader. mass = its ring radius in canvas heights; the camera maps it into the scene,
+// so it keeps the same size on screen at any zoom.
+function cursorUniforms(gl, u, c, mass, zoom, rotDeg, cx, cy){
+  const a = rotDeg * Math.PI / 180, co = Math.cos(a), si = Math.sin(a);
+  gl.uniform2f(u('uMP'), (co * c.x - si * c.y) / zoom + cx, (si * c.x + co * c.y) / zoom + cy);
+  gl.uniform1f(u('uMM'), mass * c.amp / zoom);
+}
+
+return { VERT, FRAG, UNIFORMS, COLORS, hex, setup, makeCursor, cursorUniforms };
 }
 
 // Runs one portal inside `el` with the settings S and no controls. This is what "Export code" ships.
@@ -311,7 +266,7 @@ function dojiPortalMount(el, S, core){
   const gl = canvas.getContext('webgl2', { antialias: false, alpha: !!S.transparent, premultipliedAlpha: true });
   if (!gl) { canvas.remove(); return null; }
   const { u } = core.setup(gl);
-  const disturb = core.makeDisturb(gl);
+  const cursor = core.makeCursor();
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const timeScale = reduced ? Math.min(S.time, 0.4) : S.time;
 
@@ -327,10 +282,10 @@ function dojiPortalMount(el, S, core){
   function onMove(e){
     const r = canvas.getBoundingClientRect();
     const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
-    if (!inside || !r.height) { disturb.lift(); return; }
-    disturb.move((e.clientX - r.left - r.width / 2) / r.height, -(e.clientY - r.top - r.height / 2) / r.height);
+    if (!inside || !r.height) { cursor.leave(); return; }
+    cursor.move((e.clientX - r.left - r.width / 2) / r.height, -(e.clientY - r.top - r.height / 2) / r.height);
   }
-  const onLift = () => disturb.lift();
+  const onLift = () => cursor.leave();
   window.addEventListener('pointermove', onMove, { passive: true });
   window.addEventListener('pointercancel', onLift);
   document.addEventListener('pointerleave', onLift);
@@ -352,13 +307,13 @@ function dojiPortalMount(el, S, core){
     if (bph > 6283.2) bph -= 6283.2;
     if (phase > 400) phase -= 400;
     if (t > 1800) t -= 1800;
-    const live = disturb.step(dt, canvas.width / canvas.height, S.mstr, S.msize, S.msettle);
+    const cur = cursor.step(dt, S.mlag);
     gl.uniform1f(u('uPhase'), phase);
     gl.uniform1f(u('uBreathPh'), bph);
     gl.uniform2f(u('uRes'), canvas.width, canvas.height);
     gl.uniform1f(u('uT'), t);
     gl.uniform1f(u('uAlpha'), S.transparent ? 1 : 0);
-    gl.uniform1f(u('uDispOn'), live ? 1 : 0);
+    core.cursorUniforms(gl, u, cur, S.mmass, S.zoom, S.rot, S.cx, S.cy);
     for (const [id, n] of Object.entries(core.UNIFORMS)) gl.uniform1f(u(n), +S[id]);
     for (const [id, n] of Object.entries(core.COLORS)) gl.uniform3fv(u(n), core.hex(S[id]));
     gl.drawArrays(gl.TRIANGLES, 0, 3);

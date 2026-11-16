@@ -4,7 +4,7 @@ const canvas = document.getElementById('gl');
 const gl = canvas.getContext('webgl2', { antialias: false });
 if (!gl) { document.querySelector('.stage').textContent = 'This browser does not support WebGL 2, which this piece needs.'; return; }
 const { u } = core.setup(gl);
-const disturb = core.makeDisturb(gl);
+const cursor = core.makeCursor();
 
 const $ = id => document.getElementById(id);
 const sliders = core.UNIFORMS;
@@ -18,7 +18,7 @@ const PALETTE = [
   ['Glow', '#ffc49a'], ['Sand', '#ffd9a0'], ['Champagne', '#ffe7c2'], ['Ivory', '#fff3dd']
 ];
 
-const units = { rot: '°', zoom: '×', msettle: 's' };
+const units = { rot: '°', zoom: '×', mlag: 's' };
 // Show as many decimals as the slider's step uses (at least 2 for fine steps), so tiny values like Spread don't read as 0.000.
 function places(el){ const s = el.step, d = (s.split('.')[1] || '').length; return +s >= 0.1 ? d : Math.max(2, d); }
 function outputs(){
@@ -54,13 +54,12 @@ canvas.addEventListener('pointermove', e => {
   setCenter(+$('cx').value - wx, +$('cy').value - wy);
 });
 const endDrag = () => { drag = null; canvas.style.cursor = 'grab'; };
-// Hover: the cursor pushes the flow around (paused while dragging the camera, so the two don't fight).
+// Hover: the cursor carries its own small lens that bends the streams like the hole does.
 canvas.addEventListener('pointermove', e => {
-  if (drag) { disturb.lift(); return; }
   const r = canvas.getBoundingClientRect();
-  disturb.move((e.clientX - r.left - r.width / 2) / r.height, -(e.clientY - r.top - r.height / 2) / r.height);
+  cursor.move((e.clientX - r.left - r.width / 2) / r.height, -(e.clientY - r.top - r.height / 2) / r.height);
 });
-canvas.addEventListener('pointerleave', () => disturb.lift());
+canvas.addEventListener('pointerleave', () => cursor.leave());
 canvas.addEventListener('pointerup', endDrag);
 canvas.addEventListener('pointercancel', endDrag);
 canvas.addEventListener('wheel', e => {
@@ -220,7 +219,7 @@ $('copy').addEventListener('click', ()=>{
 
 outputs(); resize();
 
-let t = 0, phase = 0, bph = 0, last = performance.now(), dispLive = false, exporting = false;
+let t = 0, phase = 0, bph = 0, last = performance.now(), cur = { x: 0, y: 0, amp: 0 }, exporting = false;
 function frame(now){
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
   if (busy) { requestAnimationFrame(frame); return; }
@@ -229,7 +228,7 @@ function frame(now){
   // keep the clocks small so the GPU's float precision never degrades the dot pattern
   if (phase > 400) phase -= 400;
   if (t > 1800) t -= 1800;
-  dispLive = disturb.step(dt, canvas.width / canvas.height, +$('mstr').value, +$('msize').value, +$('msettle').value);
+  cur = cursor.step(dt, +$('mlag').value);
   draw();
   requestAnimationFrame(frame);
 }
@@ -238,8 +237,8 @@ function draw(){
   gl.uniform1f(u('uBreathPh'), bph);
   gl.uniform2f(u('uRes'), canvas.width, canvas.height);
   gl.uniform1f(u('uT'), t);
-  // Exports are always rendered clean, without the mouse disturbance.
-  gl.uniform1f(u('uDispOn'), dispLive && !exporting ? 1 : 0);
+  // Exports are always rendered clean, without the cursor lens.
+  core.cursorUniforms(gl, u, exporting ? { x: 0, y: 0, amp: 0 } : cur, +$('mmass').value, +$('zoom').value, +$('rot').value, +$('cx').value, +$('cy').value);
   for (const [id, n] of Object.entries(sliders)) gl.uniform1f(u(n), +$(id).value);
   for (const [id, n] of Object.entries(colors)) gl.uniform3fv(u(n), hex($(id).value));
   gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -442,7 +441,7 @@ async function exportVideoRealtime(){
 }
 
 // ---- Export code: one self-contained HTML file a developer can open as is, or lift into a landing page ----
-// It carries the current look, the shader and the mouse disturbance, and nothing of the editor.
+// It carries the current look, the shader and the cursor lens, and nothing of the editor.
 async function exportCode(){
   const skip = new Set(['ratio', 'exportFmt', 'exportSize', 'exportLen']);
   const lines = [];

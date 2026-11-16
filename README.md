@@ -18,16 +18,16 @@ npx serve .
 
 - `index.html` – the page and control panel
 - `style.css` – panel styling
-- `portal-core.js` – the WebGL shader (in the `FRAG` string), GL setup, the mouse disturbance and the embed runtime. The editor and the exported code both run this file, so they always match.
+- `portal-core.js` – the WebGL shader (in the `FRAG` string), GL setup, the cursor lens and the embed runtime. The editor and the exported code both run this file, so they always match.
 - `main.js` – controls, presets, camera and export
 
 ## Mouse
 
-Moving the cursor over the portal drags the flow along with it, and the flow settles back when the cursor stops. The Mouse section sets how hard it pushes (Strength), how wide the push is (Size) and how long it takes to settle (Settle). Exports are rendered without it.
+The cursor carries its own small mass that bends the dot streams with the same lens as the hole: rings bulge around it, a stream behind it splits into arcs, and each depth layer bends by its own amount. Mass sets how strong it is, Lag how slowly it follows the pointer. It fades in when the pointer enters and out when it leaves. Exports are rendered without it.
 
 ## Export code
 
-Export with the format set to Code to get one self-contained `.html` file for a developer: the current look, the shader and the mouse disturbance, without the editor. Open it to see it running, or paste its `<div class="doji-portal">` and `<script>` into a landing page. The portal fills that div, so size the div with CSS. `DojiPortal.mount(element, overrides)` mounts one from code and returns `{ destroy() }`.
+Export with the format set to Code to get one self-contained `.html` file for a developer: the current look, the shader and the cursor lens, without the editor. Open it to see it running, or paste its `<div class="doji-portal">` and `<script>` into a landing page. The portal fills that div, so size the div with CSS. `DojiPortal.mount(element, overrides)` mounts one from code and returns `{ destroy() }`.
 
 ## Export
 
