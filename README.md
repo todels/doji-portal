@@ -23,7 +23,7 @@ npx serve .
 
 ## Mouse
 
-The cursor carries its own small mass that bends the dot streams with the same lens as the hole: rings bulge around it, a stream behind it splits into arcs, and each depth layer bends by its own amount. Mass sets how strong it is, Lag how slowly it follows the pointer. It fades in when the pointer enters and out when it leaves. Exports are rendered without it.
+The cursor carries its own small mass that bends the dot streams with the same lens as the hole: rings bulge around it, a stream behind it splits into arcs, and each depth layer bends by its own amount. Mass sets how strong it is, Scatter how ragged and loose the arcs around it are (0 is a clean bullseye), Lag how slowly it follows the pointer. It fades in when the pointer enters and out when it leaves. Exports are rendered without it.
 
 ## Export code
 

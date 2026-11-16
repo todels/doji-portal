@@ -18,12 +18,13 @@ uniform float uLayers,uDepth,uLOff,uHotAmt,uHotPos,uTails;
 uniform float uMass,uHor,uTwist,uTurb,uBright,uGrain;
 uniform vec3 uBlue,uHot;
 uniform float uAlpha;
-uniform vec2 uMP; uniform float uMM;
+uniform vec2 uMP; uniform float uMM,uMScat;
 float gFill=0.0;
 float gDot=1.0;
 float gFan=1.0;
 float gL=0.0;
 float gTrail=0.0;
+float gCur=0.0;
 
 float h21(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
 float h31(vec3 p){p=fract(p*0.3183099+0.1);p*=17.0;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
@@ -49,12 +50,23 @@ vec2 lens(vec2 th, float E){
 // The cursor is a second, smaller mass. It bends the streams with the same law as the hole, scaled with each
 // layer's depth the way the hole's rings are, so every layer arcs around it by its own amount.
 // It fades out a few radii away, so it stays a local warp instead of swaying the whole picture.
-vec2 cursorBend(vec2 th, float E){
+// Scatter roughs it up: each layer gets its own slightly different strength and centre, and the pull wobbles,
+// so the layers come out as ragged, overlapping arcs instead of a perfect bullseye.
+float cursorEm(float E, float seed){ return uMM*E/max(uMass,1e-4)*(1.0+(h21(vec2(seed,1.3))-0.5)*0.6*uMScat); }
+vec2 cursorBend(vec2 th, float E, float seed){
   if(uMM<=0.0) return vec2(0.0);
-  vec2 dm=th-uMP;
+  float Em=cursorEm(E,seed);
+  vec2 dm=th-uMP-(vec2(h21(vec2(seed,2.1)),h21(vec2(seed,3.7)))-0.5)*Em*0.7*uMScat;
   float rm=sqrt(dot(dm,dm)+1e-8);
-  float Em=uMM*E/max(uMass,1e-4);
-  return dm/rm*uWarp*Em*pow(Em/rm,uWFall)*exp(-pow(rm/(Em*6.0),2.0));
+  float wob=(n3(vec3(dm/Em*1.2,uT*0.25+seed*7.0))-0.5)*1.2*uMScat;
+  return dm/rm*uWarp*Em*pow(Em/rm,uWFall)*(1.0+wob)*exp(-pow(rm/(Em*6.0),2.0));
+}
+// Near the cursor the line also fans out, the way it does near the hole, so the arcs fill in with loose dots.
+float cursorSpread(vec2 th, float E, float seed){
+  if(uMM<=0.0) return 0.0;
+  float Em=cursorEm(E,seed);
+  vec2 dm=th-uMP;
+  return uMScat*Em*0.3*exp(-dot(dm,dm)/(Em*Em*9.0));
 }
 
 // Soft dot profile, pixel-aware: keeps total light constant when a dot shrinks below a pixel.
@@ -65,7 +77,7 @@ float prof(float d, float w, float fw){
 
 // 1 where the stream passes the hole, 0 far above and below it.
 float fanAt(float y){ return exp(-pow(y/(uMass*uReach+1e-4),2.0)); }
-float spreadAt(float y){ return uSpread+gFan*gFill*uMass*0.7*fanAt(y); }
+float spreadAt(float y){ return uSpread+gFan*gFill*uMass*0.7*fanAt(y)+gCur; }
 
 // A dense crowd of tiny dots packed around a line at x = off.
 // Lanes live in spread-relative units, so Spread squeezes the same dots closer instead of removing them.
@@ -161,7 +173,8 @@ void main(){
     float t=n>1.0?float(i)/(n-1.0):0.5;
     float Ei=E*mix(1.0-depthE*0.55,1.0+depthE*0.25,t);
     vec2 s0=lens(p,Ei);
-    vec2 s=s0-cursorBend(p,Ei);
+    vec2 s=s0-cursorBend(p,Ei,float(i)+1.0);
+    gCur=cursorSpread(p,Ei,float(i)+1.0);
     float fw=max(length(dFdx(s)),length(dFdy(s)));
     // Stretch only where the hole magnifies: dots keep their shape in the stream, the warp pulls them into arcs.
     float sfac=smoothstep(1.6,4.5,r/max(length(s0),1e-5));
@@ -185,7 +198,8 @@ void main(){
   // The middle line runs through its own small warp, so it bends and stretches like the rest instead of sitting on top.
   if(uFront>0.0){
     vec2 sc0=lens(p,E*uCoreBend);
-    vec2 sc=sc0-cursorBend(p,E*uCoreBend);
+    vec2 sc=sc0-cursorBend(p,E*uCoreBend,9.0);
+    gCur=cursorSpread(p,E*uCoreBend,9.0);
     float fw=max(length(dFdx(sc)),length(dFdy(sc)));
     float sfac=smoothstep(1.6,4.5,r/max(length(sc0),1e-5));
     gFan=0.0; gL=uStretch*sfac; gTrail=1.0;
@@ -202,7 +216,7 @@ void main(){
 // Setting name -> shader uniform. Speed, Breathe speed and Time drive the clocks in JavaScript instead.
 const UNIFORMS = { breathe:'uBreathAmt', zoom:'uZoom', rot:'uRotDeg', cx:'uCX', cy:'uCY', fine:'uFine', corebend:'uCoreBend', stretch:'uStretch', smode:'uTrailMode', warp:'uWarp', wfall:'uWFall', inner:'uInner', lw:'uLW', spread:'uSpread', dens:'uDens', front:'uFront', halo:'uHalo', fill:'uFill', off:'uOff', reach:'uReach',
   layers:'uLayers', depth:'uDepth', loff:'uLOff', tails:'uTails', hotamt:'uHotAmt', hotpos:'uHotPos',
-  mass:'uMass', hor:'uHor', twist:'uTwist', turb:'uTurb', bright:'uBright', grain:'uGrain' };
+  mass:'uMass', hor:'uHor', twist:'uTwist', turb:'uTurb', bright:'uBright', grain:'uGrain', mscat:'uMScat' };
 const COLORS = { cBlue:'uBlue', cHot:'uHot' };
 const hex = h => [1,3,5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
 
