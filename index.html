@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
 <!-- Bump ?v= on every deploy: GitHub Pages lets browsers cache files for 10 minutes, and this keeps a fresh page from pairing with stale CSS/JS. -->
-<link rel="stylesheet" href="style.css?v=8">
+<link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -158,7 +158,7 @@
         <button type="button" class="icon box" data-collapse aria-expanded="true" aria-controls="b-mouse" aria-labelledby="h-mouse"><svg class="ic chev"><use href="#i-chev"/></svg></button>
       </div>
       <div class="sec-body" id="b-mouse"><div class="sec-in">
-        <div class="field"><div class="lab"><label for="mmass">Mass</label><output for="mmass"></output></div><input type="range" id="mmass" min="0" max="0.2" step="0.005" value="0.05"></div>
+        <div class="field"><div class="lab"><label for="mmass">Mass</label><output for="mmass"></output></div><input type="range" id="mmass" min="0" max="0.1" step="0.001" value="0.02"></div>
         <div class="field"><div class="lab"><label for="mscat">Scatter</label><output for="mscat"></output></div><input type="range" id="mscat" min="0" max="1" step="0.01" value="0.6"></div>
         <div class="field"><div class="lab"><label for="mlag">Lag</label><output for="mlag"></output></div><input type="range" id="mlag" min="0.02" max="1" step="0.01" value="0.15"></div>
       </div></div>
@@ -228,7 +228,7 @@
 <!-- Color palette popover; lives outside the panel so the panel's scrolling and blur don't clip it -->
 <div class="cpop" id="cpop" role="dialog" aria-label="Choose a color" hidden><div class="swatches" role="radiogroup"></div></div>
 
-<script src="portal-core.js?v=8"></script>
-<script src="main.js?v=8"></script>
+<script src="portal-core.js?v=9"></script>
+<script src="main.js?v=9"></script>
 </body>
 </html>
